@@ -75,6 +75,8 @@ let base;
     await pick(page, 'Essential');
     await pick(page, 'Material');
     await page.locator('textarea').fill('Internet-facing on 14 remote-access gateways. No WAF rule yet; vendor fix 22.7R2.4 available.');
+    await page.locator('textarea').blur();
+    await page.evaluate(() => window.scrollTo(0, 0));
     await page.waitForTimeout(500);
     await shot(page, 'overview.png');
     const decide = page.locator('section').filter({ has: page.locator('h3:text-is("Move to bucket")') });

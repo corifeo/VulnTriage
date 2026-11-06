@@ -66,6 +66,11 @@ Opening `index.html` straight from disk also works, except **Load demo export**,
 
 ## Use cases
 
+Weekly queue triage, an urgent KEV listing, your own patch SLAs, re-triage when an exploit appears, audit evidence and analyst training.
+
+<details>
+<summary><b>Six scenarios, by role</b></summary>
+
 | Who | Situation | How VulnTriage helps |
 |---|---|---|
 | **Vulnerability management analyst** | Monday morning: a week of new CVEs and a handful of fresh KEV listings | Import VulnFlow's ranked queue (KEV first, then EPSS, then CVSS). Pre-fill the three evidence-backed points, add asset context, move on. The next CVE loads automatically. |
@@ -74,6 +79,8 @@ Opening `index.html` straight from disk also works, except **Load demo export**,
 | **Analyst re-triaging** | A CVE you parked in Track\* now has a public exploit | Open its card on the bucket board, change Exploitation, and it moves. The new vector and rationale replace the old ones. |
 | **GRC and audit** | "Why wasn't this patched in 14 days?" | **Export decisions** gives one record per CVE with bucket, decision vector, answers, rationale and timestamp. |
 | **Team lead training new analysts** | Juniors score everything by CVSS | Each decision point asks a plain question, explains its options and shows the evidence behind the suggestion, so the reasoning is visible and repeatable. |
+
+</details>
 
 ## The triage view
 
