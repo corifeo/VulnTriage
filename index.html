@@ -1,0 +1,584 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VulnTriage: SSVC triage queue</title>
+<meta name="description" content="Investigate CVEs, decide with a configurable SSVC flow, and work a bucketed triage queue.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  body { margin: 0; background: #0B0E13; }
+  a { color: #8DBBFF; } a:hover { color: #C2DAFF; }
+  button, input, select, textarea { font-family: inherit; }
+  button:disabled { cursor: not-allowed; }
+  :focus-visible { outline: 2px solid #6EA8FF; outline-offset: 2px; }
+  #app:empty::before { content: "Loading VulnTriage…"; display: block; padding: 40px; color: #9AA4B2; font-family: Inter, system-ui, sans-serif; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<noscript><p style="color:#E6EAF0;font-family:sans-serif;padding:24px">VulnTriage needs JavaScript.</p></noscript>
+<template id="app-template">
+
+<div style="min-height: 100vh; background: #0B0E13; color: #E6EAF0; font-family: Inter, system-ui, sans-serif; font-size: 14px; line-height: 1.45">
+
+  <!-- Top bar -->
+  <header style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 12px 24px; border-bottom: 1px solid #252C38; background: #0E1218">
+    <div style="display: flex; align-items: center; gap: 10px">
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#6EA8FF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 4v5c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V7l8-4z"></path><path d="M8.5 12l2.5 2.5 4.5-5"></path></svg>
+      <span style="font-weight: 700; font-size: 16px; letter-spacing: -0.01em">VulnTriage</span>
+      <span style="font-size: 12px; color: #9AA4B2; padding: 2px 8px; border: 1px solid #2E3644; border-radius: 999px">{{flowName}}</span>
+    </div>
+    <nav aria-label="Views" style="display: flex; gap: 4px; background: #151A22; border: 1px solid #252C38; border-radius: 11px; padding: 4px">
+      <sc-for list="{{tabs}}" as="tb" hint-placeholder-count="3">
+        <button onClick="{{tb.pick}}" aria-current="{{tb.current}}" style="height: 36px; padding: 0 14px; border-radius: 8px; border: 0; cursor: pointer; font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 8px; {{tb.style}}">{{tb.label}}<sc-if value="{{tb.hasCount}}" hint-placeholder-val="{{ false }}"><span style="font-size: 11px; padding: 1px 7px; border-radius: 999px; background: #0B0E13; color: #C3CAD5">{{tb.count}}</span></sc-if></button>
+      </sc-for>
+    </nav>
+    <div style="margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 12px; color: #9AA4B2">
+      <span style="display: inline-flex; align-items: center; gap: 6px"><span style="width: 8px; height: 8px; border-radius: 50%; {{sourceDot}}"></span>{{sourceText}}</span>
+      <button onClick="{{openImport}}" style="height: 36px; padding: 0 14px; border-radius: 9px; border: 0; background: #6EA8FF; color: #0B0E13; font-size: 13px; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; gap: 8px"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"></path><path d="M7 10l5 5 5-5"></path><path d="M4 19h16"></path></svg>Import</button>
+    </div>
+  </header>
+
+  <!-- Import dialog -->
+  <sc-if value="{{importOpen}}" hint-placeholder-val="{{ false }}">
+    <div style="position: fixed; inset: 0; z-index: 50; background: rgba(5,7,10,.72); display: flex; align-items: flex-start; justify-content: center; padding: 64px 16px; overflow-y: auto">
+      <section role="dialog" aria-label="Import vulnerabilities" style="width: 100%; max-width: 640px; background: #12161D; border: 1px solid #2E3644; border-radius: 16px; box-shadow: 0 24px 60px rgba(0,0,0,.5); padding: 22px; display: flex; flex-direction: column; gap: 16px">
+        <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 12px">
+          <div style="display: flex; flex-direction: column; gap: 4px">
+            <h2 style="margin: 0; font-size: 18px; font-weight: 700">Import vulnerabilities</h2>
+            <span style="font-size: 12.5px; color: #9AA4B2">A VulnFlow triage export (<code style="font-family: 'JetBrains Mono', monospace; color: #C3CAD5">vulntriage.queue/v1</code>). Evidence and suggested SSVC values come with it.</span>
+          </div>
+          <button onClick="{{closeImport}}" aria-label="Close" style="width: 36px; height: 36px; border-radius: 9px; border: 1px solid #2A3240; background: transparent; color: #C3CAD5; cursor: pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+        </div>
+
+        <label onDragOver="{{dragOver}}" onDrop="{{dropFile}}" style="position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 26px 16px; border: 1.5px dashed #3D5F94; border-radius: 12px; background: #0F1319; cursor: pointer; text-align: center">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#6EA8FF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"></path><path d="M14 3v5h5"></path><path d="M12 12v6"></path><path d="M9 15l3-3 3 3"></path></svg>
+          <span style="font-size: 14px; font-weight: 600">Drop a JSON file or click to choose</span>
+          <span style="font-size: 12px; color: #9AA4B2">uv run examples/scripts/triage_queue.py data/triage-queue.json</span>
+          <input type="file" accept=".json,application/json" onChange="{{pickFile}}" style="position: absolute; width: 1px; height: 1px; opacity: 0">
+        </label>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 8px">
+          <button onClick="{{togglePaste}}" aria-expanded="{{pasteExpanded}}" style="height: 34px; padding: 0 12px; border-radius: 8px; border: 1px solid #2E3644; background: transparent; color: #C3CAD5; font-size: 12.5px; cursor: pointer">Paste JSON instead</button>
+          <button onClick="{{loadDemo}}" style="height: 34px; padding: 0 12px; border-radius: 8px; border: 1px dashed #3D5F94; background: transparent; color: #BFD7FF; font-size: 12.5px; cursor: pointer">Load demo export</button>
+        </div>
+        <sc-if value="{{pasteOpen}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 8px">
+            <textarea rows="6" value="{{pasteVal}}" onChange="{{setPaste}}" aria-label="Paste export JSON" placeholder="{&quot;schema&quot;: &quot;vulntriage.queue/v1&quot;, &quot;items&quot;: [...]}" style="background: #0F1319; border: 1px solid #2A3240; border-radius: 10px; color: #E6EAF0; padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: 12px; resize: vertical"></textarea>
+            <button onClick="{{parsePaste}}" style="align-self: flex-end; height: 36px; padding: 0 14px; border-radius: 9px; border: 1px solid #2E3644; background: transparent; color: #C3CAD5; font-size: 13px; cursor: pointer">Read pasted JSON</button>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{importHasError}}" hint-placeholder-val="{{ false }}">
+          <div role="alert" style="padding: 10px 12px; border-radius: 10px; background: #2A1512; border: 1px solid #5A2A20; color: #FFB4A0; font-size: 13px">{{importError}}</div>
+        </sc-if>
+
+        <sc-if value="{{importHasPreview}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 12px; background: #0F1319; border: 1px solid #1F2631">
+            <div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; font-size: 12.5px">
+              <span style="font-weight: 600; color: #E6EAF0">{{pv.fileName}}</span>
+              <span style="color: #9AA4B2">{{pv.generator}} · {{pv.generated}}</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px">
+              <sc-for list="{{pv.tiles}}" as="ti" hint-placeholder-count="4">
+                <div style="background: #151A22; border-radius: 9px; padding: 8px 10px"><div style="font-size: 11px; color: #9AA4B2">{{ti.k}}</div><div style="font-size: 18px; font-weight: 700">{{ti.v}}</div></div>
+              </sc-for>
+            </div>
+            <span style="font-size: 12px; color: #9AA4B2">{{pv.filters}}</span>
+            <div style="display: flex; flex-direction: column; gap: 4px; max-height: 150px; overflow-y: auto">
+              <sc-for list="{{pv.sample}}" as="ps" hint-placeholder-count="4">
+                <div style="display: flex; gap: 10px; font-size: 12px; align-items: baseline"><span style="font-family: 'JetBrains Mono', monospace; color: #8DBBFF; flex: 0 0 auto">{{ps.id}}</span><span style="color: #C3CAD5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{ps.title}}</span></div>
+              </sc-for>
+            </div>
+            <button onClick="{{toggleReplace}}" aria-pressed="{{pv.replacePressed}}" style="display: flex; align-items: center; gap: 10px; background: transparent; border: 0; color: #C3CAD5; font-size: 13px; cursor: pointer; padding: 4px 0; text-align: left">
+              <span style="width: 36px; height: 22px; border-radius: 999px; padding: 3px; box-sizing: border-box; display: flex; {{pv.trackStyle}}"><span style="width: 16px; height: 16px; border-radius: 50%; background: #FFFFFF; {{pv.knobStyle}}"></span></span>
+              Replace the sample CVEs (otherwise imports are added to the queue)
+            </button>
+          </div>
+          <div style="display: flex; justify-content: flex-end; gap: 10px">
+            <button onClick="{{closeImport}}" style="height: 42px; padding: 0 16px; border-radius: 10px; border: 1px solid #2E3644; background: transparent; color: #C3CAD5; font-size: 14px; cursor: pointer">Cancel</button>
+            <button onClick="{{confirmImport}}" style="height: 42px; padding: 0 18px; border-radius: 10px; border: 0; background: #6EA8FF; color: #0B0E13; font-size: 14px; font-weight: 700; cursor: pointer">{{pv.cta}}</button>
+          </div>
+        </sc-if>
+      </section>
+    </div>
+  </sc-if>
+
+  <!-- Bucket strip (all views) -->
+  <div style="display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 24px; border-bottom: 1px solid #1C222C; background: #0D1117">
+    <div style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 9px; border: 1px dashed #2E3644; font-size: 12.5px">
+      <span style="color: #9AA4B2">To triage</span><strong style="font-size: 15px">{{untriagedCount}}</strong>
+    </div>
+    <sc-for list="{{bucketStrip}}" as="bs" hint-placeholder-count="4">
+      <div style="display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 9px; background: #12161D; border: 1px solid #252C38; font-size: 12.5px; transition: all .3s ease; {{bs.pulse}}">
+        <span style="width: 10px; height: 10px; border-radius: 3px; {{bs.dot}}"></span>
+        <span style="color: #C3CAD5">{{bs.name}}</span><strong style="font-size: 15px">{{bs.count}}</strong>
+      </div>
+    </sc-for>
+  </div>
+
+  <!-- ============ QUEUE VIEW ============ -->
+  <sc-if value="{{isQueue}}" hint-placeholder-val="{{ true }}">
+  <div style="display: flex; flex-wrap: wrap; align-items: flex-start; gap: 20px; padding: 20px 24px 40px; max-width: 1680px; margin: 0 auto; box-sizing: border-box">
+
+    <aside style="flex: 1 1 280px; max-width: 340px; min-width: 0; background: #12161D; border: 1px solid #252C38; border-radius: 14px; overflow: hidden">
+      <div style="padding: 14px 14px 10px; display: flex; flex-direction: column; gap: 10px">
+        <h2 style="margin: 0; font-size: 15px; font-weight: 600">Queue</h2>
+        <div style="display: flex; gap: 6px">
+          <sc-for list="{{qtabs}}" as="qt" hint-placeholder-count="2">
+            <button onClick="{{qt.pick}}" style="flex: 1; height: 34px; border-radius: 8px; font-size: 12.5px; font-weight: 600; cursor: pointer; {{qt.style}}">{{qt.label}}</button>
+          </sc-for>
+        </div>
+        <label style="display: flex; align-items: center; gap: 8px; background: #151A22; border: 1px solid #2A3240; border-radius: 9px; padding: 0 10px; height: 36px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9AA4B2" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-3.5-3.5"></path></svg>
+          <span style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0)">Filter queue</span>
+          <input type="search" placeholder="Filter CVE, product, CWE" value="{{filterText}}" onChange="{{setFilter}}" style="flex: 1; background: transparent; border: 0; outline: none; color: #E6EAF0; font-size: 13px; height: 34px">
+        </label>
+      </div>
+      <div style="display: flex; flex-direction: column; border-top: 1px solid #252C38">
+        <sc-if value="{{listEmpty}}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 28px 16px; text-align: center; color: #9AA4B2; font-size: 13px">{{listEmptyText}}</div>
+        </sc-if>
+        <sc-for list="{{qlist}}" as="v" hint-placeholder-count="6">
+          <button onClick="{{v.pick}}" style="text-align: left; display: flex; flex-direction: column; gap: 6px; padding: 13px 14px; border: 0; border-bottom: 1px solid #1E242E; cursor: pointer; color: #E6EAF0; transition: background .2s ease; {{v.rowStyle}}">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px">
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 12.5px; font-weight: 600">{{v.id}}</span>
+              <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600; padding: 2px 7px; border-radius: 6px; {{v.cvssStyle}}">{{v.cvss}}</span>
+            </div>
+            <span style="font-size: 13px; color: #C3CAD5">{{v.product}}: {{v.short}}</span>
+            <div style="display: flex; flex-wrap: wrap; gap: 6px; font-size: 11px">
+              <sc-if value="{{v.kev}}" hint-placeholder-val="{{ false }}"><span style="padding: 2px 7px; border-radius: 5px; background: #3A2410; color: #FFC27A; font-weight: 600">KEV</span></sc-if>
+              <span style="padding: 2px 7px; border-radius: 5px; background: #1A1F28; color: #AEB7C4">EPSS {{v.epss}}</span>
+              <span style="padding: 2px 7px; border-radius: 5px; background: #1A1F28; color: #AEB7C4">{{v.age}}</span>
+              <sc-if value="{{v.hasBucket}}" hint-placeholder-val="{{ false }}"><span style="padding: 2px 7px; border-radius: 5px; font-weight: 700; {{v.bucketStyle}}">{{v.bucketName}}</span></sc-if>
+            </div>
+          </button>
+        </sc-for>
+      </div>
+    </aside>
+
+    <main style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+      <sc-if value="{{hasToast}}" hint-placeholder-val="{{ false }}">
+        <div role="status" style="display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-radius: 12px; font-size: 13.5px; font-weight: 600; {{toastStyle}}">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"></path></svg>
+          <span>{{toast}}</span>
+        </div>
+      </sc-if>
+
+      <section style="background: #12161D; border: 1px solid #252C38; border-radius: 14px; padding: 18px 22px; display: flex; flex-direction: column; gap: 10px">
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 13px; color: #8DBBFF; font-weight: 600">{{cur.id}}</span>
+          <sc-if value="{{cur.kev}}" hint-placeholder-val="{{ false }}"><span style="font-size: 11px; padding: 2px 8px; border-radius: 5px; background: #3A2410; color: #FFC27A; font-weight: 600">Known exploited · added {{cur.kevDate}}</span></sc-if>
+          <sc-if value="{{curHasBucket}}" hint-placeholder-val="{{ false }}"><span style="font-size: 11px; padding: 2px 8px; border-radius: 5px; font-weight: 700; {{curBucketStyle}}">In {{curBucketName}} · re-triage below</span></sc-if>
+          <span style="font-size: 12px; color: #9AA4B2; margin-left: auto">{{queuePos}}</span>
+        </div>
+        <h1 style="margin: 0; font-size: 21px; line-height: 1.25; font-weight: 650; letter-spacing: -0.01em">{{cur.title}}</h1>
+        <div style="display: flex; flex-wrap: wrap; gap: 20px; font-size: 13px; color: #9AA4B2">
+          <span>CVSS <strong style="color: #E6EAF0">{{cur.cvss}}</strong></span>
+          <span>EPSS <strong style="color: #E6EAF0">{{cur.epss}}</strong> ({{cur.epssPct}} pct)</span>
+          <span>{{cur.cwe}}</span>
+          <span>Assets matched <strong style="color: #E6EAF0">{{cur.assets}}</strong></span>
+        </div>
+      </section>
+
+      <section aria-label="Decision path" style="background: #12161D; border: 1px solid #252C38; border-radius: 14px; padding: 16px 22px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+        <span style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: #9AA4B2; margin-right: 6px">Path</span>
+        <sc-for list="{{path}}" as="p" hint-placeholder-count="4">
+          <div style="display: inline-flex; align-items: center; gap: 10px">
+            <div style="display: flex; flex-direction: column; padding: 6px 12px; border-radius: 10px; transition: all .25s ease; {{p.style}}">
+              <span style="font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; color: #9AA4B2">{{p.k}}</span>
+              <span style="font-size: 14px; font-weight: 600">{{p.v}}</span>
+            </div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4B5566" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg>
+          </div>
+        </sc-for>
+        <div style="display: flex; flex-direction: column; padding: 6px 16px; border-radius: 10px; transition: all .3s ease; {{outcomeChip}}">
+          <span style="font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.06em; opacity: .8">Bucket</span>
+          <span style="font-size: 16px; font-weight: 700">{{outcomeLabel}}</span>
+        </div>
+        <button onClick="{{acceptSuggested}}" style="margin-left: auto; height: 36px; padding: 0 14px; border-radius: 9px; border: 1px dashed #6EA8FF; background: transparent; color: #BFD7FF; font-size: 13px; cursor: pointer">Pre-fill from evidence</button>
+        <button onClick="{{resetAnswers}}" style="height: 36px; padding: 0 14px; border-radius: 9px; border: 1px solid #2E3644; background: transparent; color: #C3CAD5; font-size: 13px; cursor: pointer">Reset</button>
+      </section>
+
+      <sc-for list="{{steps}}" as="s" hint-placeholder-count="4">
+        <section style="border-radius: 14px; padding: 18px 22px; display: flex; flex-direction: column; gap: 12px; transition: opacity .3s ease, border-color .3s ease, box-shadow .3s ease; {{s.cardStyle}}">
+          <div style="display: flex; align-items: flex-start; gap: 14px">
+            <div style="flex: 0 0 auto; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; transition: all .3s ease; {{s.numStyle}}">{{s.num}}</div>
+            <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px">
+              <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px">
+                <h3 style="margin: 0; font-size: 17px; font-weight: 650">{{s.name}}</h3>
+                <sc-if value="{{s.hasValue}}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px; color: #8DBBFF; font-weight: 600">{{s.valueLabel}}</span></sc-if>
+              </div>
+              <p style="margin: 0; color: #9AA4B2; font-size: 13px">{{s.question}}</p>
+            </div>
+          </div>
+          <div style="display: flex; gap: 10px; align-items: flex-start; padding: 9px 12px; background: #0F1319; border: 1px solid #1F2631; border-radius: 10px; font-size: 12.5px; color: #C3CAD5">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#6EA8FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: 0 0 auto; margin-top: 1px"><path d="M9 18h6"></path><path d="M10 22h4"></path><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"></path></svg>
+            <span><strong style="color: #E6EAF0; font-weight: 600">{{s.sourceLabel}}:</strong> {{s.evidence}}</span>
+          </div>
+          <sc-for list="{{s.groups}}" as="g" hint-placeholder-count="1">
+            <div style="display: flex; flex-direction: column; gap: 8px">
+              <sc-if value="{{g.hasLabel}}" hint-placeholder-val="{{ false }}"><span style="font-size: 12px; color: #9AA4B2; text-transform: uppercase; letter-spacing: 0.06em">{{g.label}}</span></sc-if>
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px">
+                <sc-for list="{{g.options}}" as="o" hint-placeholder-count="3">
+                  <button onClick="{{o.pick}}" disabled="{{s.locked}}" aria-pressed="{{o.pressed}}" style="position: relative; text-align: left; min-height: 60px; padding: 11px 14px; border-radius: 11px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; transition: background .2s ease, border-color .2s ease, box-shadow .2s ease; {{o.style}}">
+                    <span style="font-size: 15px; font-weight: 650; padding-right: 64px">{{o.label}}</span>
+                    <span style="font-size: 12px; color: #9AA4B2; line-height: 1.35">{{o.desc}}</span>
+                    <sc-if value="{{o.suggested}}" hint-placeholder-val="{{ false }}"><span style="position: absolute; top: 8px; right: 10px; font-size: 10px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: #BFD7FF; border: 1px dashed #6EA8FF; border-radius: 5px; padding: 1px 5px">Evidence</span></sc-if>
+                  </button>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+        </section>
+      </sc-for>
+
+      <section style="background: #12161D; border: 1px solid #252C38; border-radius: 14px; padding: 18px 22px; display: flex; flex-direction: column; gap: 14px">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap">
+          <h3 style="margin: 0; font-size: 17px; font-weight: 650">Move to bucket</h3>
+          <span style="font-size: 12px; color: #9AA4B2">{{outcomeHint}}</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px">
+          <sc-for list="{{buckets}}" as="b" hint-placeholder-count="4">
+            <div style="border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 5px; transition: all .35s ease; {{b.style}}">
+              <span style="font-size: 19px; font-weight: 750; letter-spacing: -0.01em">{{b.name}}</span>
+              <span style="font-size: 12px; line-height: 1.4; {{b.textStyle}}">{{b.desc}}</span>
+              <span style="font-size: 11.5px; font-weight: 600; margin-top: 2px; {{b.textStyle}}">Target: {{b.sla}}</span>
+            </div>
+          </sc-for>
+        </div>
+        <sc-if value="{{hasFloorNote}}" hint-placeholder-val="{{ false }}">
+          <div style="font-size: 12.5px; color: #FFC85C; padding: 8px 12px; border: 1px solid #4A3A18; background: #1E180C; border-radius: 9px">{{floorNote}}</div>
+        </sc-if>
+        <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: stretch">
+          <label style="flex: 1 1 320px; display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #9AA4B2">
+            Analyst rationale
+            <textarea rows="2" placeholder="Why these values? Compensating controls, exposure, owner." value="{{rationale}}" onChange="{{setRationale}}" style="resize: vertical; background: #0F1319; border: 1px solid #2A3240; border-radius: 10px; color: #E6EAF0; padding: 10px 12px; font-size: 13px"></textarea>
+          </label>
+          <div style="flex: 1 1 240px; display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: #9AA4B2">
+            Decision vector
+            <code style="background: #0F1319; border: 1px solid #2A3240; border-radius: 10px; padding: 10px 12px; font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #C3CAD5; word-break: break-all">{{vector}}</code>
+          </div>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-end">
+          <button onClick="{{skip}}" style="height: 44px; padding: 0 18px; border-radius: 10px; border: 1px solid #2E3644; background: transparent; color: #C3CAD5; font-size: 14px; cursor: pointer">Skip for now</button>
+          <button onClick="{{record}}" disabled="{{notComplete}}" style="height: 44px; padding: 0 22px; border-radius: 10px; border: 0; font-size: 14px; font-weight: 650; cursor: pointer; transition: all .25s ease; {{recordStyle}}">{{recordLabel}}</button>
+        </div>
+      </section>
+    </main>
+
+    <aside style="flex: 1 1 320px; max-width: 400px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+      <section style="background: #12161D; border: 1px solid #252C38; border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+        <h2 style="margin: 0; font-size: 15px; font-weight: 600">Summary</h2>
+        <p style="margin: 0; color: #C3CAD5; font-size: 13px">{{cur.summary}}</p>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; font-size: 12px">
+          <div style="background: #0F1319; border-radius: 8px; padding: 8px 10px"><div style="color: #9AA4B2">Product</div><div style="font-weight: 600">{{cur.product}}</div></div>
+          <div style="background: #0F1319; border-radius: 8px; padding: 8px 10px"><div style="color: #9AA4B2">Affected</div><div style="font-weight: 600">{{cur.affected}}</div></div>
+          <div style="background: #0F1319; border-radius: 8px; padding: 8px 10px"><div style="color: #9AA4B2">Fixed in</div><div style="font-weight: 600">{{cur.fixed}}</div></div>
+          <div style="background: #0F1319; border-radius: 8px; padding: 8px 10px"><div style="color: #9AA4B2">Exploit refs</div><div style="font-weight: 600">{{cur.exploits}}</div></div>
+        </div>
+      </section>
+      <section style="background: #12161D; border: 1px solid #252C38; border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 8px">
+          <h2 style="margin: 0; font-size: 15px; font-weight: 600">Attack vector breakdown</h2>
+          <span style="font-size: 11px; color: #9AA4B2">CVSS {{cur.cvssVerLabel}}</span>
+        </div>
+        <div style="display: flex; flex-direction: column">
+          <sc-for list="{{chain}}" as="c" hint-placeholder-count="5">
+            <div style="display: flex; gap: 12px; align-items: stretch">
+              <div style="display: flex; flex-direction: column; align-items: center; width: 14px">
+                <span style="width: 12px; height: 12px; border-radius: 50%; margin-top: 4px; {{c.dot}}"></span>
+                <sc-if value="{{c.line}}" hint-placeholder-val="{{ true }}"><span style="flex: 1; width: 2px; background: #252C38; margin: 2px 0"></span></sc-if>
+              </div>
+              <div style="flex: 1; padding-bottom: 12px; display: flex; flex-direction: column; gap: 1px">
+                <div style="display: flex; justify-content: space-between; gap: 8px">
+                  <span style="font-size: 12px; color: #9AA4B2">{{c.k}}</span>
+                  <span style="font-size: 12px; font-weight: 600; {{c.valStyle}}">{{c.v}}</span>
+                </div>
+                <span style="font-size: 12.5px; color: #C3CAD5">{{c.note}}</span>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 6px">
+          <span style="font-size: 12px; color: #9AA4B2">Impact if exploited</span>
+          <sc-for list="{{cia}}" as="x" hint-placeholder-count="3">
+            <div style="display: flex; align-items: center; gap: 10px; font-size: 12px">
+              <span style="width: 92px; color: #C3CAD5">{{x.k}}</span>
+              <div style="flex: 1; height: 8px; background: #1A1F28; border-radius: 4px; overflow: hidden"><div style="height: 100%; border-radius: 4px; transition: width .4s ease; {{x.bar}}"></div></div>
+              <span style="width: 40px; text-align: right; font-weight: 600">{{x.v}}</span>
+            </div>
+          </sc-for>
+        </div>
+        <code style="font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #9AA4B2; word-break: break-all">{{cur.vector}}</code>
+      </section>
+      <section style="background: #12161D; border: 1px solid #252C38; border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px">
+        <h2 style="margin: 0; font-size: 15px; font-weight: 600">Exploit intelligence</h2>
+        <div style="display: flex; justify-content: space-between; font-size: 12px"><span style="color: #9AA4B2">EPSS probability (30 days)</span><span style="font-weight: 600">{{cur.epss}}</span></div>
+        <div style="height: 8px; background: #1A1F28; border-radius: 4px; overflow: hidden"><div style="height: 100%; background: #F5B03D; border-radius: 4px; {{epssBar}}"></div></div>
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; font-size: 12px">
+          <div style="background: #0F1319; border-radius: 8px; padding: 8px 10px"><div style="color: #9AA4B2">KEV</div><div style="font-weight: 600">{{cur.kevText}}</div></div>
+          <div style="background: #0F1319; border-radius: 8px; padding: 8px 10px"><div style="color: #9AA4B2">Ransomware use</div><div style="font-weight: 600">{{cur.ransom}}</div></div>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 4px; padding-top: 6px; border-top: 1px solid #1F2631">
+          <span style="font-size: 12px; color: #9AA4B2">CISA Vulnrichment (ADP) SSVC</span>
+          <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: #C3CAD5">{{cur.adp}}</span>
+        </div>
+      </section>
+    </aside>
+  </div>
+  </sc-if>
+
+  <!-- ============ BOARD VIEW ============ -->
+  <sc-if value="{{isBoard}}" hint-placeholder-val="{{ false }}">
+  <div style="padding: 20px 24px 40px; display: flex; flex-direction: column; gap: 14px">
+    <div style="display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 10px">
+      <h2 style="margin: 0; font-size: 18px; font-weight: 650">Buckets</h2>
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+        <span style="font-size: 12.5px; color: #9AA4B2">Open any card to re-triage it. Cards whose bucket was deleted return to the queue.</span>
+        <button onClick="{{exportDecisions}}" style="height: 36px; padding: 0 14px; border-radius: 9px; border: 1px solid #2E3644; background: transparent; color: #C3CAD5; font-size: 13px; cursor: pointer">Export decisions (JSON)</button>
+      </div>
+    </div>
+    <div data-keep-scroll style="overflow-x: auto; padding-bottom: 8px">
+      <div style="display: flex; gap: 14px; align-items: flex-start; min-width: min-content">
+        <sc-for list="{{board}}" as="col" hint-placeholder-count="5">
+          <section style="flex: 0 0 270px; background: #12161D; border: 1px solid #252C38; border-radius: 14px; overflow: hidden; display: flex; flex-direction: column">
+            <div style="padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; {{col.headStyle}}">
+              <div style="display: flex; align-items: center; justify-content: space-between">
+                <span style="font-size: 15px; font-weight: 700">{{col.name}}</span>
+                <span style="font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: rgba(11,14,19,.25)">{{col.count}}</span>
+              </div>
+              <span style="font-size: 11.5px; opacity: .85">{{col.sla}}</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px; padding: 10px; min-height: 120px">
+              <sc-if value="{{col.empty}}" hint-placeholder-val="{{ false }}"><div style="padding: 20px 8px; text-align: center; font-size: 12px; color: #6B7586; border: 1px dashed #252C38; border-radius: 10px">Nothing here yet</div></sc-if>
+              <sc-for list="{{col.cards}}" as="cd" hint-placeholder-count="2">
+                <button onClick="{{cd.open}}" style="text-align: left; display: flex; flex-direction: column; gap: 5px; padding: 11px 12px; border-radius: 10px; background: #151A22; border: 1px solid #2A3240; color: #E6EAF0; cursor: pointer">
+                  <div style="display: flex; justify-content: space-between; gap: 8px">
+                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; font-weight: 600">{{cd.id}}</span>
+                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 11.5px; font-weight: 600; padding: 1px 6px; border-radius: 5px; {{cd.cvssStyle}}">{{cd.cvss}}</span>
+                  </div>
+                  <span style="font-size: 12.5px; color: #C3CAD5">{{cd.product}}: {{cd.short}}</span>
+                  <sc-if value="{{cd.hasVec}}" hint-placeholder-val="{{ false }}"><span style="font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: #9AA4B2; word-break: break-all">{{cd.vec}}</span></sc-if>
+                </button>
+              </sc-for>
+            </div>
+          </section>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <!-- ============ CONFIGURE VIEW ============ -->
+  <sc-if value="{{isConfig}}" hint-placeholder-val="{{ false }}">
+  <div style="padding: 20px 24px 48px; max-width: 1560px; margin: 0 auto; box-sizing: border-box; display: flex; flex-direction: column; gap: 18px">
+
+    <section style="background: #12161D; border: 1px solid #252C38; border-radius: 14px; padding: 16px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 14px">
+      <label style="display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: #9AA4B2; flex: 1 1 260px">
+        Flow name
+        <input value="{{flowName}}" onChange="{{setFlowName}}" style="height: 38px; background: #0F1319; border: 1px solid #2A3240; border-radius: 9px; color: #E6EAF0; padding: 0 12px; font-size: 15px; font-weight: 600">
+      </label>
+      <div style="display: flex; flex-wrap: wrap; gap: 16px; font-size: 12.5px; color: #9AA4B2">
+        <span><strong style="color: #E6EAF0; font-size: 16px">{{stats.points}}</strong> decision points</span>
+        <span><strong style="color: #E6EAF0; font-size: 16px">{{stats.paths}}</strong> paths</span>
+        <span><strong style="color: #E6EAF0; font-size: 16px">{{stats.buckets}}</strong> buckets</span>
+        <span><strong style="color: #E6EAF0; font-size: 16px">{{stats.rules}}</strong> override rules</span>
+      </div>
+      <div style="margin-left: auto; display: flex; flex-wrap: wrap; gap: 8px">
+        <button onClick="{{loadCisa}}" style="height: 38px; padding: 0 14px; border-radius: 9px; border: 1px solid #2E3644; background: transparent; color: #C3CAD5; font-size: 13px; cursor: pointer">Start from CISA tree</button>
+        <button onClick="{{loadBlank}}" style="height: 38px; padding: 0 14px; border-radius: 9px; border: 1px solid #2E3644; background: transparent; color: #C3CAD5; font-size: 13px; cursor: pointer">Blank flow</button>
+        <button onClick="{{exportConfig}}" style="height: 38px; padding: 0 14px; border-radius: 9px; border: 1px solid #2E3644; background: transparent; color: #C3CAD5; font-size: 13px; cursor: pointer">Export flow</button>
+        <label style="position: relative; height: 38px; padding: 0 14px; border-radius: 9px; border: 1px solid #2E3644; color: #C3CAD5; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center">Import flow<input type="file" accept=".json,application/json" onChange="{{importConfig}}" style="position: absolute; width: 1px; height: 1px; opacity: 0"></label>
+        <button onClick="{{clearSaved}}" style="height: 38px; padding: 0 14px; border-radius: 9px; border: 1px solid #3A2420; background: transparent; color: #FF9C80; font-size: 13px; cursor: pointer">Clear saved data</button>
+        <button onClick="{{goQueue}}" style="height: 38px; padding: 0 16px; border-radius: 9px; border: 0; background: #6EA8FF; color: #0B0E13; font-size: 13px; font-weight: 700; cursor: pointer">Use in queue</button>
+      </div>
+    </section>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start">
+
+      <!-- Decision points -->
+      <section style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 0">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px">
+          <h2 style="margin: 0; font-size: 16px; font-weight: 650">Decision points</h2>
+          <span style="font-size: 12px; color: #9AA4B2">Asked in this order</span>
+        </div>
+        <sc-for list="{{points}}" as="pt" hint-placeholder-count="4">
+          <div style="display: flex; flex-direction: column; align-items: stretch">
+            <article style="background: #12161D; border: 1px solid #252C38; border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px">
+              <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 10px">
+                <span style="width: 28px; height: 28px; border-radius: 50%; background: #1A2A44; color: #BFD7FF; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px">{{pt.num}}</span>
+                <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 2px 8px; border-radius: 6px; {{pt.kindStyle}}">{{pt.kind}}</span>
+                <div style="margin-left: auto; display: flex; gap: 4px">
+                  <button onClick="{{pt.up}}" disabled="{{pt.noUp}}" aria-label="Move up" style="width: 32px; height: 32px; border-radius: 8px; border: 1px solid #2A3240; background: transparent; color: #C3CAD5; cursor: pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 15l6-6 6 6"></path></svg></button>
+                  <button onClick="{{pt.down}}" disabled="{{pt.noDown}}" aria-label="Move down" style="width: 32px; height: 32px; border-radius: 8px; border: 1px solid #2A3240; background: transparent; color: #C3CAD5; cursor: pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button>
+                  <button onClick="{{pt.remove}}" disabled="{{pt.noRemove}}" aria-label="Delete decision point" style="width: 32px; height: 32px; border-radius: 8px; border: 1px solid #3A2420; background: transparent; color: #FF9C80; cursor: pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16"></path><path d="M9 7V4h6v3"></path><path d="M6 7l1 13h10l1-13"></path></svg></button>
+                </div>
+              </div>
+              <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px">
+                <label style="display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: #9AA4B2">Name
+                  <input value="{{pt.name}}" onChange="{{pt.setName}}" style="height: 36px; background: #0F1319; border: 1px solid #2A3240; border-radius: 8px; color: #E6EAF0; padding: 0 10px; font-size: 14px; font-weight: 600">
+                </label>
+                <div style="display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: #9AA4B2">Evidence source (pre-fill)
+                  <button onClick="{{pt.cycleSource}}" style="height: 36px; display: flex; align-items: center; justify-content: space-between; gap: 8px; background: #0F1319; border: 1px solid #2A3240; border-radius: 8px; color: #E6EAF0; padding: 0 10px; font-size: 13px; cursor: pointer; text-align: left">{{pt.sourceLabel}}<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9AA4B2" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M7 10l5-5 5 5"></path><path d="M7 14l5 5 5-5"></path></svg></button>
+                </div>
+              </div>
+              <label style="display: flex; flex-direction: column; gap: 4px; font-size: 11.5px; color: #9AA4B2">Question shown to the analyst
+                <input value="{{pt.question}}" onChange="{{pt.setQuestion}}" style="height: 36px; background: #0F1319; border: 1px solid #2A3240; border-radius: 8px; color: #E6EAF0; padding: 0 10px; font-size: 13px">
+              </label>
+
+              <sc-if value="{{pt.isChoice}}" hint-placeholder-val="{{ true }}">
+                <div style="display: flex; flex-direction: column; gap: 6px">
+                  <span style="font-size: 11.5px; color: #9AA4B2">Options</span>
+                  <div style="display: flex; flex-wrap: wrap; gap: 8px">
+                    <sc-for list="{{pt.options}}" as="op" hint-placeholder-count="3">
+                      <div style="display: inline-flex; align-items: center; gap: 2px; background: #151A22; border: 1px solid #2A3240; border-radius: 9px; padding: 3px 3px 3px 4px">
+                        <input value="{{op.label}}" onChange="{{op.setLabel}}" aria-label="Option label" style="width: 120px; height: 30px; background: transparent; border: 0; color: #E6EAF0; padding: 0 6px; font-size: 13px; font-weight: 600">
+                        <button onClick="{{op.remove}}" disabled="{{op.noRemove}}" aria-label="Remove option" style="width: 28px; height: 28px; border-radius: 6px; border: 0; background: transparent; color: #9AA4B2; cursor: pointer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+                      </div>
+                    </sc-for>
+                    <button onClick="{{pt.addOption}}" style="height: 38px; padding: 0 12px; border-radius: 9px; border: 1px dashed #3D5F94; background: transparent; color: #BFD7FF; font-size: 12.5px; cursor: pointer">+ Option</button>
+                  </div>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{pt.isCombine}}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; flex-wrap: wrap; gap: 14px">
+                  <div style="flex: 1 1 260px; display: flex; flex-direction: column; gap: 10px">
+                    <sc-for list="{{pt.inputs}}" as="inp" hint-placeholder-count="2">
+                      <div style="display: flex; flex-direction: column; gap: 6px; padding: 10px; background: #0F1319; border: 1px solid #1F2631; border-radius: 10px">
+                        <input value="{{inp.name}}" onChange="{{inp.setName}}" aria-label="Input question name" style="height: 30px; background: transparent; border: 0; border-bottom: 1px solid #2A3240; color: #E6EAF0; padding: 0 2px; font-size: 13px; font-weight: 600">
+                        <div style="display: flex; flex-wrap: wrap; gap: 6px">
+                          <sc-for list="{{inp.options}}" as="io" hint-placeholder-count="3">
+                            <div style="display: inline-flex; align-items: center; background: #151A22; border: 1px solid #2A3240; border-radius: 8px; padding: 2px">
+                              <input value="{{io.label}}" onChange="{{io.setLabel}}" aria-label="Input option" style="width: 92px; height: 28px; background: transparent; border: 0; color: #E6EAF0; padding: 0 6px; font-size: 12.5px">
+                              <button onClick="{{io.remove}}" disabled="{{io.noRemove}}" aria-label="Remove option" style="width: 26px; height: 26px; border-radius: 6px; border: 0; background: transparent; color: #9AA4B2; cursor: pointer"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+                            </div>
+                          </sc-for>
+                          <button onClick="{{inp.addOption}}" style="height: 34px; padding: 0 10px; border-radius: 8px; border: 1px dashed #3D5F94; background: transparent; color: #BFD7FF; font-size: 12px; cursor: pointer">+</button>
+                        </div>
+                      </div>
+                    </sc-for>
+                    <div style="display: flex; flex-direction: column; gap: 6px">
+                      <span style="font-size: 11.5px; color: #9AA4B2">Result levels</span>
+                      <div style="display: flex; flex-wrap: wrap; gap: 6px">
+                        <sc-for list="{{pt.outputs}}" as="ou" hint-placeholder-count="3">
+                          <div style="display: inline-flex; align-items: center; background: #1A2A44; border: 1px solid #3D5F94; border-radius: 8px; padding: 2px">
+                            <input value="{{ou.label}}" onChange="{{ou.setLabel}}" aria-label="Result level" style="width: 84px; height: 28px; background: transparent; border: 0; color: #E6EAF0; padding: 0 6px; font-size: 12.5px; font-weight: 600">
+                            <button onClick="{{ou.remove}}" disabled="{{ou.noRemove}}" aria-label="Remove level" style="width: 26px; height: 26px; border-radius: 6px; border: 0; background: transparent; color: #9AA4B2; cursor: pointer"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+                          </div>
+                        </sc-for>
+                        <button onClick="{{pt.addOutput}}" style="height: 34px; padding: 0 10px; border-radius: 8px; border: 1px dashed #3D5F94; background: transparent; color: #BFD7FF; font-size: 12px; cursor: pointer">+</button>
+                      </div>
+                    </div>
+                  </div>
+                  <div style="flex: 1 1 260px; display: flex; flex-direction: column; gap: 6px">
+                    <span style="font-size: 11.5px; color: #9AA4B2">Combination matrix (click a cell to cycle)</span>
+                    <div style="overflow-x: auto; display: flex; flex-direction: column; gap: 4px; font-size: 12px">
+                      <span style="color: #6B7586">Rows: {{pt.rowAxis}} · Columns: {{pt.colAxis}}</span>
+                      <div style="display: grid; gap: 4px; {{pt.mCols}}">
+                        <span></span>
+                        <sc-for list="{{pt.mHead}}" as="mh" hint-placeholder-count="3"><span style="color: #9AA4B2; font-weight: 600; padding: 4px 2px; text-align: center">{{mh.label}}</span></sc-for>
+                      </div>
+                      <sc-for list="{{pt.mRows}}" as="mr" hint-placeholder-count="3">
+                        <div style="display: grid; gap: 4px; align-items: center; {{pt.mCols}}">
+                          <span style="color: #9AA4B2; font-weight: 600">{{mr.label}}</span>
+                          <sc-for list="{{mr.cells}}" as="mc" hint-placeholder-count="3">
+                            <button onClick="{{mc.cycle}}" style="height: 34px; border-radius: 7px; font-size: 12px; font-weight: 700; cursor: pointer; {{mc.style}}">{{mc.label}}</button>
+                          </sc-for>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </div>
+                </div>
+              </sc-if>
+            </article>
+            <div style="display: flex; justify-content: center; height: 22px"><span style="width: 2px; background: #252C38"></span></div>
+          </div>
+        </sc-for>
+        <div style="display: flex; flex-wrap: wrap; gap: 10px">
+          <button onClick="{{addChoice}}" style="flex: 1 1 200px; height: 46px; border-radius: 12px; border: 1.5px dashed #3D5F94; background: #10151D; color: #BFD7FF; font-size: 13.5px; font-weight: 600; cursor: pointer">+ Add decision point</button>
+          <button onClick="{{addCombine}}" style="flex: 1 1 200px; height: 46px; border-radius: 12px; border: 1.5px dashed #5A4A8C; background: #12111C; color: #D9CCFF; font-size: 13.5px; font-weight: 600; cursor: pointer">+ Add combined point (2 questions → 1 result)</button>
+        </div>
+      </section>
+
+      <!-- Right column: buckets + overrides -->
+      <div style="flex: 1 1 380px; min-width: 0; max-width: 520px; display: flex; flex-direction: column; gap: 18px">
+        <section style="background: #12161D; border: 1px solid #252C38; border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px">
+          <div style="display: flex; align-items: baseline; justify-content: space-between">
+            <h2 style="margin: 0; font-size: 16px; font-weight: 650">Buckets</h2>
+            <span style="font-size: 12px; color: #9AA4B2">Lowest to highest urgency</span>
+          </div>
+          <sc-for list="{{bucketCfg}}" as="bc" hint-placeholder-count="4">
+            <div style="display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 11px; background: #0F1319; border: 1px solid #1F2631; {{bc.edge}}">
+              <div style="display: flex; align-items: center; gap: 8px">
+                <input value="{{bc.name}}" onChange="{{bc.setName}}" aria-label="Bucket name" style="flex: 1; min-width: 0; height: 34px; background: #151A22; border: 1px solid #2A3240; border-radius: 8px; color: #E6EAF0; padding: 0 10px; font-size: 14px; font-weight: 700">
+                <span style="font-size: 11px; color: #9AA4B2; white-space: nowrap">{{bc.used}} paths</span>
+                <button onClick="{{bc.up}}" disabled="{{bc.noUp}}" aria-label="Less urgent" style="width: 30px; height: 30px; border-radius: 7px; border: 1px solid #2A3240; background: transparent; color: #C3CAD5; cursor: pointer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 15l6-6 6 6"></path></svg></button>
+                <button onClick="{{bc.down}}" disabled="{{bc.noDown}}" aria-label="More urgent" style="width: 30px; height: 30px; border-radius: 7px; border: 1px solid #2A3240; background: transparent; color: #C3CAD5; cursor: pointer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 9l6 6 6-6"></path></svg></button>
+                <button onClick="{{bc.remove}}" disabled="{{bc.noRemove}}" aria-label="Delete bucket" style="width: 30px; height: 30px; border-radius: 7px; border: 1px solid #3A2420; background: transparent; color: #FF9C80; cursor: pointer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+              </div>
+              <input value="{{bc.sla}}" onChange="{{bc.setSla}}" aria-label="Remediation target" placeholder="Remediation target" style="height: 32px; background: #151A22; border: 1px solid #2A3240; border-radius: 8px; color: #C3CAD5; padding: 0 10px; font-size: 12.5px">
+              <div style="display: flex; gap: 6px">
+                <sc-for list="{{bc.swatches}}" as="sw" hint-placeholder-count="6">
+                  <button onClick="{{sw.pick}}" aria-label="{{sw.label}}" style="width: 26px; height: 26px; border-radius: 7px; cursor: pointer; {{sw.style}}"></button>
+                </sc-for>
+              </div>
+            </div>
+          </sc-for>
+          <button onClick="{{addBucket}}" style="height: 42px; border-radius: 10px; border: 1.5px dashed #3D5F94; background: transparent; color: #BFD7FF; font-size: 13px; font-weight: 600; cursor: pointer">+ Add bucket</button>
+        </section>
+
+        <section style="background: #12161D; border: 1px solid #252C38; border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px">
+          <div style="display: flex; flex-direction: column; gap: 2px">
+            <h2 style="margin: 0; font-size: 16px; font-weight: 650">Override rules</h2>
+            <span style="font-size: 12px; color: #9AA4B2">Set a minimum bucket whatever the table says. Applied after the policy table.</span>
+          </div>
+          <sc-for list="{{floors}}" as="fl" hint-placeholder-count="1">
+            <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 10px; border-radius: 10px; background: #0F1319; border: 1px solid #1F2631; font-size: 12.5px; color: #9AA4B2">
+              <button onClick="{{fl.toggle}}" aria-pressed="{{fl.pressed}}" aria-label="Rule enabled" style="width: 40px; height: 24px; border-radius: 999px; border: 0; padding: 3px; cursor: pointer; display: flex; transition: background .2s ease; {{fl.trackStyle}}"><span style="width: 18px; height: 18px; border-radius: 50%; background: #FFFFFF; transition: margin .2s ease; {{fl.knobStyle}}"></span></button>
+              <span>If</span>
+              <button onClick="{{fl.cycleStep}}" style="height: 32px; padding: 0 10px; background: #151A22; border: 1px solid #2A3240; border-radius: 7px; color: #E6EAF0; font-size: 12.5px; font-weight: 600; cursor: pointer">{{fl.stepLabel}}</button>
+              <span>is</span>
+              <button onClick="{{fl.cycleValue}}" style="height: 32px; padding: 0 10px; background: #1A2A44; border: 1px solid #3D5F94; border-radius: 7px; color: #E6EAF0; font-size: 12.5px; font-weight: 600; cursor: pointer">{{fl.valueLabel}}</button>
+              <span>then at least</span>
+              <button onClick="{{fl.cycleBucket}}" style="height: 32px; padding: 0 10px; border-radius: 7px; font-size: 12.5px; font-weight: 700; cursor: pointer; border: 0; {{fl.bucketStyle}}">{{fl.bucketLabel}}</button>
+              <button onClick="{{fl.remove}}" aria-label="Delete rule" style="margin-left: auto; width: 30px; height: 30px; border-radius: 7px; border: 1px solid #3A2420; background: transparent; color: #FF9C80; cursor: pointer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+            </div>
+          </sc-for>
+          <button onClick="{{addFloor}}" style="height: 40px; border-radius: 10px; border: 1.5px dashed #3D5F94; background: transparent; color: #BFD7FF; font-size: 13px; font-weight: 600; cursor: pointer">+ Add rule</button>
+        </section>
+      </div>
+    </div>
+
+    <!-- Policy table -->
+    <section style="background: #12161D; border: 1px solid #252C38; border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px">
+      <div style="display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px">
+        <h2 style="margin: 0; font-size: 16px; font-weight: 650">Outcome policy</h2>
+        <span style="font-size: 12px; color: #9AA4B2">Every path through the flow maps to one bucket. Click a cell to cycle buckets. {{policyNote}}</span>
+      </div>
+      <div data-keep-scroll style="overflow-x: auto">
+        <div style="display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; min-width: min-content">
+          <div style="display: grid; gap: 6px; padding: 0 8px; {{policyCols}}">
+            <sc-for list="{{policyHead}}" as="ph" hint-placeholder-count="6"><span style="font-weight: 600; padding: 6px 2px; white-space: nowrap; {{ph.style}}">{{ph.label}}</span></sc-for>
+          </div>
+          <sc-for list="{{policyRows}}" as="pr" hint-placeholder-count="8">
+            <div style="display: grid; gap: 6px; align-items: center; padding: 3px 8px; background: #0F1319; border-radius: 9px; {{policyCols}}">
+              <sc-for list="{{pr.keys}}" as="pk" hint-placeholder-count="3"><span style="color: #C3CAD5; white-space: nowrap; {{pk.style}}">{{pk.label}}</span></sc-for>
+              <sc-for list="{{pr.outs}}" as="po" hint-placeholder-count="3"><button onClick="{{po.cycle}}" style="height: 32px; border-radius: 7px; font-size: 12px; font-weight: 700; cursor: pointer; transition: background .2s ease; {{po.style}}">{{po.label}}</button></sc-for>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+  </div>
+  </sc-if>
+</div>
+</template>
+<script src="src/runtime.js"></script>
+<script src="src/app.js"></script>
+</body>
+</html>

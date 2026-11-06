@@ -1,0 +1,448 @@
+{
+  "schema": "vulntriage.queue/v1",
+  "generated_at": "2026-11-06T22:01:51.278138Z",
+  "generator": "vulnflow 0.1.0",
+  "filters": {
+    "start": null,
+    "end": null,
+    "kev_only": false,
+    "min_epss": null,
+    "min_cvss": null,
+    "limit": 500
+  },
+  "enrichment": {
+    "kev": true,
+    "epss": true,
+    "cvss_flattened": true
+  },
+  "matched": 5,
+  "count": 5,
+  "items": [
+    {
+      "id": "CVE-2021-44228",
+      "title": "Apache Log4j2 Remote Code Execution Vulnerability",
+      "description": "Apache Log4j2 2.0-beta9 through 2.15.0 (excluding security releases 2.12.2, 2.12.3, and 2.3.1) JNDI features used in configuration, log messages, and parameters do not protect against attacker controlled LDAP and other JNDI related endpoints. An attacker who can control log messages or log message parameters can execute arbitrary code loaded from LDAP servers when message lookup substitution is enabled. From log4j 2.15.0, this behavior has been disabled by default. From version 2.16.0 (along with 2.12.2, 2.12.3, and 2.3.1), this functionality has been completely removed. Note that this vulnerability is specific to log4j-core and does not affect log4net, log4cxx, or other Apache Logging Services projects.",
+      "published": "2021-12-10T10:15:09.143000Z",
+      "modified": "2026-08-11T19:33:44.513000Z",
+      "nvd_status": "analyzed",
+      "product": {
+        "vendor": "Apache",
+        "name": "Log4j2",
+        "fixed_in": [
+          "2.3.1",
+          "2.12.2",
+          "2.15.0"
+        ],
+        "cpe_count": 396
+      },
+      "cvss": {
+        "version": "3.1",
+        "score": 10.0,
+        "severity": "CRITICAL",
+        "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:H/I:H/A:H",
+        "metrics": {
+          "AV": "N",
+          "AC": "L",
+          "PR": "N",
+          "UI": "N",
+          "S": "C",
+          "C": "H",
+          "I": "H",
+          "A": "H"
+        },
+        "source": "nvd"
+      },
+      "cwe": [
+        "CWE-20",
+        "CWE-400",
+        "CWE-502",
+        "CWE-917"
+      ],
+      "epss": null,
+      "kev": {
+        "listed": true,
+        "date_added": "2021-12-10T00:00:00Z",
+        "due_date": "2021-12-24T00:00:00Z",
+        "ransomware": true,
+        "required_action": "Apply updates per vendor instructions"
+      },
+      "exploit_refs": [
+        "http://packetstormsecurity.com/files/165261/Apache-Log4j2-2.14.1-Information-Disclosure.html",
+        "http://packetstormsecurity.com/files/165270/Apache-Log4j2-2.14.1-Remote-Code-Execution.html",
+        "http://packetstormsecurity.com/files/165371/VMware-Security-Advisory-2021-0028.4.html",
+        "http://packetstormsecurity.com/files/165532/Log4Shell-HTTP-Header-Injection.html",
+        "http://packetstormsecurity.com/files/165642/VMware-vCenter-Server-Unauthenticated-Log4Shell-JNDI-Injection-Remote-Code-Execution.html",
+        "http://packetstormsecurity.com/files/165673/UniFi-Network-Application-Unauthenticated-Log4Shell-Remote-Code-Execution.html",
+        "http://packetstormsecurity.com/files/167917/MobileIron-Log4Shell-Remote-Command-Execution.html",
+        "http://seclists.org/fulldisclosure/2022/Dec/2",
+        "https://github.com/nu11secur1ty/CVE-mitre/tree/main/CVE-2021-44228",
+        "https://twitter.com/kurtseifried/status/1469345530182455296",
+        "https://www.nu11secur1ty.com/2021/12/cve-2021-44228.html",
+        "http://packetstormsecurity.com/files/165261/Apache-Log4j2-2.14.1-Information-Disclosure.html",
+        "http://packetstormsecurity.com/files/165270/Apache-Log4j2-2.14.1-Remote-Code-Execution.html",
+        "http://packetstormsecurity.com/files/165371/VMware-Security-Advisory-2021-0028.4.html",
+        "http://packetstormsecurity.com/files/165532/Log4Shell-HTTP-Header-Injection.html",
+        "http://packetstormsecurity.com/files/165642/VMware-vCenter-Server-Unauthenticated-Log4Shell-JNDI-Injection-Remote-Code-Execution.html",
+        "http://packetstormsecurity.com/files/165673/UniFi-Network-Application-Unauthenticated-Log4Shell-Remote-Code-Execution.html",
+        "http://packetstormsecurity.com/files/167917/MobileIron-Log4Shell-Remote-Command-Execution.html",
+        "http://seclists.org/fulldisclosure/2022/Dec/2",
+        "https://github.com/nu11secur1ty/CVE-mitre/tree/main/CVE-2021-44228",
+        "https://twitter.com/kurtseifried/status/1469345530182455296",
+        "https://www.nu11secur1ty.com/2021/12/cve-2021-44228.html"
+      ],
+      "references": [
+        {
+          "url": "http://packetstormsecurity.com/files/165225/Apache-Log4j2-2.14.1-Remote-Code-Execution.html",
+          "tags": [
+            "Third Party Advisory",
+            "VDB Entry"
+          ]
+        },
+        {
+          "url": "http://packetstormsecurity.com/files/165260/VMware-Security-Advisory-2021-0028.html",
+          "tags": [
+            "Third Party Advisory",
+            "VDB Entry"
+          ]
+        },
+        {
+          "url": "http://packetstormsecurity.com/files/165261/Apache-Log4j2-2.14.1-Information-Disclosure.html",
+          "tags": [
+            "Exploit",
+            "Third Party Advisory",
+            "VDB Entry"
+          ]
+        },
+        {
+          "url": "http://packetstormsecurity.com/files/165270/Apache-Log4j2-2.14.1-Remote-Code-Execution.html",
+          "tags": [
+            "Exploit",
+            "Third Party Advisory",
+            "VDB Entry"
+          ]
+        },
+        {
+          "url": "http://packetstormsecurity.com/files/165281/Log4j2-Log4Shell-Regexes.html",
+          "tags": [
+            "Third Party Advisory",
+            "VDB Entry"
+          ]
+        },
+        {
+          "url": "http://packetstormsecurity.com/files/165282/Log4j-Payload-Generator.html",
+          "tags": [
+            "Third Party Advisory",
+            "VDB Entry"
+          ]
+        },
+        {
+          "url": "http://packetstormsecurity.com/files/165306/L4sh-Log4j-Remote-Code-Execution.html",
+          "tags": [
+            "Third Party Advisory",
+            "VDB Entry"
+          ]
+        },
+        {
+          "url": "http://packetstormsecurity.com/files/165307/Log4j-Remote-Code-Execution-Word-Bypassing.html",
+          "tags": [
+            "Third Party Advisory",
+            "VDB Entry"
+          ]
+        },
+        {
+          "url": "http://packetstormsecurity.com/files/165311/log4j-scan-Extensive-Scanner.html",
+          "tags": [
+            "Broken Link",
+            "Third Party Advisory",
+            "VDB Entry"
+          ]
+        },
+        {
+          "url": "http://packetstormsecurity.com/files/165371/VMware-Security-Advisory-2021-0028.4.html",
+          "tags": [
+            "Exploit",
+            "Third Party Advisory",
+            "VDB Entry"
+          ]
+        },
+        {
+          "url": "http://packetstormsecurity.com/files/165532/Log4Shell-HTTP-Header-Injection.html",
+          "tags": [
+            "Exploit",
+            "Third Party Advisory",
+            "VDB Entry"
+          ]
+        },
+        {
+          "url": "http://packetstormsecurity.com/files/165642/VMware-vCenter-Server-Unauthenticated-Log4Shell-JNDI-Injection-Remote-Code-Execution.html",
+          "tags": [
+            "Exploit",
+            "Third Party Advisory",
+            "VDB Entry"
+          ]
+        },
+        {
+          "url": "http://packetstormsecurity.com/files/165673/UniFi-Network-Application-Unauthenticated-Log4Shell-Remote-Code-Execution.html",
+          "tags": [
+            "Exploit",
+            "Third Party Advisory",
+            "VDB Entry"
+          ]
+        },
+        {
+          "url": "http://packetstormsecurity.com/files/167794/Open-Xchange-App-Suite-7.10.x-Cross-Site-Scripting-Command-Injection.html",
+          "tags": [
+            "Third Party Advisory",
+            "VDB Entry"
+          ]
+        },
+        {
+          "url": "http://packetstormsecurity.com/files/167917/MobileIron-Log4Shell-Remote-Command-Execution.html",
+          "tags": [
+            "Exploit",
+            "Third Party Advisory",
+            "VDB Entry"
+          ]
+        }
+      ],
+      "evidence": {
+        "exploitation": {
+          "value": "active",
+          "reason": "Listed in CISA KEV on 2021-12-10"
+        },
+        "automatable": {
+          "value": "yes",
+          "reason": "AV:N, AC:L, PR:N, UI:N: no barrier to scripting at scale"
+        },
+        "technical_impact": {
+          "value": "total",
+          "reason": "High confidentiality and integrity impact"
+        }
+      }
+    },
+    {
+      "id": "CVE-2024-0003",
+      "title": "Widget Library XSS",
+      "description": "Cross-site scripting (XSS) vulnerability in Widget Library allows injection of arbitrary web scripts.",
+      "published": "2024-01-05T14:00:00Z",
+      "modified": "2024-01-14T10:00:00Z",
+      "nvd_status": "modified",
+      "product": {
+        "vendor": "Vendor",
+        "name": "Widget Library",
+        "fixed_in": [],
+        "cpe_count": 2
+      },
+      "cvss": {
+        "version": "4.0",
+        "score": 5.1,
+        "severity": "MEDIUM",
+        "vector": "CVSS:4.0/AV:N/AC:L/AT:N/PR:N/UI:P/VC:L/VI:L/VA:N/SC:L/SI:L/SA:N",
+        "metrics": {
+          "AV": "N",
+          "AC": "L",
+          "AT": "N",
+          "PR": "N",
+          "UI": "P",
+          "VC": "L",
+          "VI": "L",
+          "VA": "N",
+          "SC": "L",
+          "SI": "L",
+          "SA": "N"
+        },
+        "source": "nvd"
+      },
+      "cwe": [
+        "CWE-79"
+      ],
+      "epss": {
+        "probability": 0.00234,
+        "percentile": 0.34567,
+        "date": "2024-01-15T00:00:00Z"
+      },
+      "kev": {
+        "listed": true,
+        "date_added": "2024-01-15T00:00:00Z",
+        "due_date": "2024-02-05T00:00:00Z",
+        "ransomware": true,
+        "required_action": "Apply updates per vendor instructions"
+      },
+      "exploit_refs": [],
+      "references": [
+        {
+          "url": "https://vendor.com/security/xss-fix",
+          "tags": [
+            "Vendor Advisory",
+            "Patch"
+          ]
+        }
+      ],
+      "evidence": {
+        "exploitation": {
+          "value": "active",
+          "reason": "Listed in CISA KEV on 2024-01-15"
+        },
+        "automatable": {
+          "value": "no",
+          "reason": "Barrier to automation: UI:P"
+        },
+        "technical_impact": {
+          "value": "partial",
+          "reason": "Impact C:L I:L A:N: not full control"
+        }
+      }
+    },
+    {
+      "id": "CVE-2024-0001",
+      "title": "Example Product RCE",
+      "description": "A critical vulnerability in Example Product allows remote code execution via crafted input.",
+      "published": "2024-01-10T10:00:00Z",
+      "modified": "2024-01-12T15:30:00Z",
+      "nvd_status": "analyzed",
+      "product": {
+        "vendor": "Example",
+        "name": "Product",
+        "fixed_in": [
+          "2.0.0"
+        ],
+        "cpe_count": 1
+      },
+      "cvss": {
+        "version": "3.1",
+        "score": 9.8,
+        "severity": "CRITICAL",
+        "vector": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+        "metrics": {
+          "AV": "N",
+          "AC": "L",
+          "PR": "N",
+          "UI": "N",
+          "S": "U",
+          "C": "H",
+          "I": "H",
+          "A": "H"
+        },
+        "source": "nvd"
+      },
+      "cwe": [
+        "CWE-94"
+      ],
+      "epss": {
+        "probability": 0.00044,
+        "percentile": 0.05123,
+        "date": "2024-01-15T00:00:00Z"
+      },
+      "kev": {
+        "listed": true,
+        "date_added": "2024-01-11T00:00:00Z",
+        "due_date": "2024-02-01T00:00:00Z",
+        "ransomware": false,
+        "required_action": "Apply updates per vendor instructions"
+      },
+      "exploit_refs": [],
+      "references": [
+        {
+          "url": "https://example.com/security/advisory-2024-001",
+          "tags": [
+            "Vendor Advisory"
+          ]
+        },
+        {
+          "url": "https://example.com/releases/v2.0.0",
+          "tags": [
+            "Patch",
+            "Release Notes"
+          ]
+        }
+      ],
+      "evidence": {
+        "exploitation": {
+          "value": "active",
+          "reason": "Listed in CISA KEV on 2024-01-11"
+        },
+        "automatable": {
+          "value": "yes",
+          "reason": "AV:N, AC:L, PR:N, UI:N: no barrier to scripting at scale"
+        },
+        "technical_impact": {
+          "value": "total",
+          "reason": "High confidentiality and integrity impact"
+        }
+      }
+    },
+    {
+      "id": "CVE-2024-0002",
+      "title": "SQL injection vulnerability in Another Product login form",
+      "description": "SQL injection vulnerability in Another Product login form.",
+      "published": "2024-01-08T08:00:00Z",
+      "modified": "2024-01-08T08:00:00Z",
+      "nvd_status": "awaiting",
+      "product": {
+        "vendor": null,
+        "name": null,
+        "fixed_in": [],
+        "cpe_count": 0
+      },
+      "cvss": null,
+      "cwe": [],
+      "epss": {
+        "probability": 0.9748,
+        "percentile": 0.9999,
+        "date": "2024-01-15T00:00:00Z"
+      },
+      "kev": {
+        "listed": false,
+        "date_added": null,
+        "due_date": null,
+        "ransomware": false,
+        "required_action": null
+      },
+      "exploit_refs": [],
+      "references": [
+        {
+          "url": "https://another.example.com/advisory",
+          "tags": []
+        }
+      ],
+      "evidence": {
+        "exploitation": {
+          "value": "none",
+          "reason": "Not in KEV and no exploit references"
+        }
+      }
+    },
+    {
+      "id": "CVE-2015-0001",
+      "title": "Buffer overflow in Legacy Product allows remote attackers to execute arbitrary code",
+      "description": "Buffer overflow in Legacy Product allows remote attackers to execute arbitrary code.",
+      "published": "2015-03-10T12:00:00Z",
+      "modified": "2015-03-10T12:00:00Z",
+      "nvd_status": "analyzed",
+      "product": {
+        "vendor": null,
+        "name": null,
+        "fixed_in": [],
+        "cpe_count": 0
+      },
+      "cvss": null,
+      "cwe": [],
+      "epss": null,
+      "kev": {
+        "listed": false,
+        "date_added": null,
+        "due_date": null,
+        "ransomware": false,
+        "required_action": null
+      },
+      "exploit_refs": [],
+      "references": [],
+      "evidence": {
+        "exploitation": {
+          "value": "none",
+          "reason": "Not in KEV and no exploit references"
+        }
+      }
+    }
+  ]
+}
