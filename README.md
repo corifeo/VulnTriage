@@ -6,6 +6,7 @@
 </p>
 
 <p align="center">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green"></a>
   <img alt="Status: first draft" src="https://img.shields.io/badge/status-first%20draft-B7791F">
   <img alt="Dependencies: none" src="https://img.shields.io/badge/dependencies-none-1D7447">
   <img alt="Runs in the browser" src="https://img.shields.io/badge/runs-in%20the%20browser-465264">
@@ -32,6 +33,7 @@
 - [Development](#development)
 - [Security and privacy](#security-and-privacy)
 - [Limitations and roadmap](#limitations-and-roadmap)
+- [License](#license)
 
 ## Why this exists
 
@@ -223,3 +225,7 @@ The script serves the repository itself, clears local storage, and drives the re
 - [ ] Decisions export to CSV and ticketing systems
 - [ ] Shared queue with an audit trail
 - [ ] Light theme
+
+## License
+
+Released under the [MIT License](LICENSE).
