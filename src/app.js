@@ -4,7 +4,7 @@ class Component extends DCLogic {
     super(props);
     this.state = { tab: 'queue', qtab: 'todo', sel: 'CVE-2026-41872', ans: {}, records: {}, toast: null, flash: null, config: this.cisa(), seq: 100, skipped: {},
       importOpen: false, importErr: null, preview: null, replaceSample: false, imported: [], paste: '', importMeta: null,
-      filterText: '', rationale: '', pasteOpen: false, replaceSampleApplied: false };
+      filterText: '', rationale: '', qpage: null, boardShow: {}, pasteOpen: false, replaceSampleApplied: false };
     const saved = this.loadSaved();
     if (saved) Object.assign(this.state, saved);
   }
@@ -104,14 +104,22 @@ class Component extends DCLogic {
       return out;
     } catch (_) { return null; }
   }
+  saveNow() {
+    clearTimeout(this._saveTimer); this._saveTimer = null;
+    const st = this.state;
+    try {
+      window.localStorage.setItem(this.storageKey(), JSON.stringify({ config: st.config, records: st.records, imported: st.imported, importMeta: st.importMeta, replaceSampleApplied: st.replaceSampleApplied, seq: st.seq }));
+    } catch (_) { /* storage full or blocked: keep working in memory */ }
+  }
   componentDidUpdate() {
+    if (!this._flushBound) {
+      // A pending save must not be lost when the tab is hidden, reloaded or closed.
+      this._flushBound = () => { if (this._saveTimer) this.saveNow(); };
+      window.addEventListener('pagehide', this._flushBound);
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') this._flushBound(); });
+    }
     clearTimeout(this._saveTimer);
-    this._saveTimer = setTimeout(() => {
-      const st = this.state;
-      try {
-        window.localStorage.setItem(this.storageKey(), JSON.stringify({ config: st.config, records: st.records, imported: st.imported, importMeta: st.importMeta, replaceSampleApplied: st.replaceSampleApplied, seq: st.seq }));
-      } catch (_) { /* storage full or blocked: keep working in memory */ }
-    }, 300);
+    this._saveTimer = setTimeout(() => this.saveNow(), 300);
   }
   download(name, data) {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -212,7 +220,7 @@ class Component extends DCLogic {
 
   open(id) {
     const r = this.state.records[id];
-    this.setState({ sel: id, ans: r ? Object.assign({}, r.ans) : {}, rationale: r && r.rationale ? r.rationale : '', tab: 'queue', toast: null });
+    this.setState({ sel: id, ans: r ? Object.assign({}, r.ans) : {}, rationale: r && r.rationale ? r.rationale : '', tab: 'queue', toast: null, qpage: null });
   }
 
   renderVals() {
@@ -224,13 +232,15 @@ class Component extends DCLogic {
     const ans = st.ans;
     const res = this.decide(cfg, ans);
     const out = res ? res.bucket : null;
+    // Most new CVEs have no CPE data yet; show the title alone rather than "Unknown product: ...".
+    const rowLabel = (v) => v.product && v.product !== 'Unknown product' ? v.product + ': ' + v.short : (v.title && v.title.length > 72 ? v.title.slice(0, 71) + '…' : (v.title || v.short));
     const cvssStyle = (c) => { c = parseFloat(c); return c >= 9 ? 'background: #3B1A14; color: #FF9C80' : (c >= 7 ? 'background: #3A2A10; color: #FFC85C' : 'background: #1A1F28; color: #C3CAD5'); };
     const fill = (b) => 'background: ' + b.color + '; color: #0B0E13';
 
     // tabs
     const untriaged = V.filter((v) => !recBucket(v.id));
     const done = V.filter((v) => recBucket(v.id));
-    const tabs = [['queue', 'Triage queue', untriaged.length], ['board', 'Buckets', null], ['config', 'Configure flow', null]].map((t) => ({
+    const tabs = [['queue', 'Triage queue', untriaged.length], ['board', 'Buckets', null], ['config', 'Configure', null]].map((t) => ({
       label: t[1], hasCount: t[2] !== null, count: t[2], current: st.tab === t[0] ? 'page' : 'false',
       style: st.tab === t[0] ? 'background: #1A2A44; color: #FFFFFF' : 'background: transparent; color: #9AA4B2',
       pick: () => this.setState({ tab: t[0] })
@@ -242,13 +252,23 @@ class Component extends DCLogic {
     // queue list
     const q = (st.filterText || '').trim().toLowerCase();
     const listSrc = (st.qtab === 'todo' ? untriaged : done).filter((v) => !q || [v.id, v.product, v.short, v.cwe, v.title].join(' ').toLowerCase().includes(q));
-    const qlist = listSrc.map((v) => {
+    const PAGE = 20;
+    const pages = Math.max(1, Math.ceil(listSrc.length / PAGE));
+    const curIdx = listSrc.findIndex((v) => v.id === cur.id);
+    const page = st.qpage == null ? (curIdx >= 0 ? Math.floor(curIdx / PAGE) : 0) : Math.max(0, Math.min(st.qpage, pages - 1));
+    const pageStart = page * PAGE, pageEnd = Math.min(listSrc.length, pageStart + PAGE);
+    const goPage = (n) => this.setState({ qpage: Math.max(0, Math.min(n, pages - 1)) });
+    const listTotal = st.qtab === 'todo' ? untriaged.length : done.length;
+    const pager = { hasPager: pages > 1, pageText: (pageStart + 1) + '–' + pageEnd + ' of ' + listSrc.length, pageLabel: 'Page ' + (page + 1) + ' of ' + pages,
+      atFirst: page === 0, atLast: page >= pages - 1, firstPage: () => goPage(0), prevPage: () => goPage(page - 1), nextPage: () => goPage(page + 1), lastPage: () => goPage(pages - 1),
+      listCount: q ? listSrc.length + ' of ' + listTotal + ' match' : listTotal + (listTotal === 1 ? ' CVE' : ' CVEs') + (pages > 1 ? ' · ' + PAGE + ' per page' : '') };
+    const qlist = listSrc.slice(pageStart, pageEnd).map((v) => {
       const b = recBucket(v.id);
-      return Object.assign({}, v, { pick: () => this.open(v.id),
+      return Object.assign({}, v, { label: rowLabel(v), pick: () => this.open(v.id),
         rowStyle: v.id === cur.id ? 'background: #18233A; box-shadow: inset 3px 0 0 #6EA8FF' : 'background: transparent',
         cvssStyle: cvssStyle(v.cvss), hasBucket: !!b, bucketName: b ? bById[b].name : '', bucketStyle: b ? fill(bById[b]) : '' });
     });
-    const qtabs = [['todo', 'To triage (' + untriaged.length + ')'], ['done', 'Done (' + done.length + ')']].map((q) => ({ label: q[1], pick: () => this.setState({ qtab: q[0] }),
+    const qtabs = [['todo', 'To triage (' + untriaged.length + ')'], ['done', 'Done (' + done.length + ')']].map((q) => ({ label: q[1], pick: () => this.setState({ qtab: q[0], qpage: 0 }),
       style: st.qtab === q[0] ? 'background: #1A2A44; border: 1px solid #3D5F94; color: #FFFFFF' : 'background: transparent; border: 1px solid #2A3240; color: #9AA4B2' }));
 
     // steps
@@ -275,7 +295,7 @@ class Component extends DCLogic {
         numStyle: v ? 'background: #6EA8FF; color: #0B0E13' : (isActive ? 'background: #1A2A44; color: #BFD7FF; border: 1.5px solid #6EA8FF' : 'background: #1A1F28; color: #9AA4B2') };
     });
     const path = cfg.steps.map((s, i) => { const v = vsNow[i]; const lbl = v ? (this.vals(s).find((o) => o.id === v) || {}).label : null;
-      return { k: s.name, v: lbl || '?', style: lbl ? 'background: #1A2A44; border: 1px solid #3D5F94; color: #E6EAF0' : 'background: #10141A; border: 1px dashed #2E3644; color: #6B7586' }; });
+      return { n: i + 1, k: s.name, kNb: s.name.replace(/-/g, '\u2011'), v: lbl || '?', style: lbl ? 'background: #1A2A44; border: 1px solid #3D5F94; color: #E6EAF0' : 'background: #10141A; border: 1px dashed #2E3644; color: #6B7586' }; });
 
     const buckets = cfg.buckets.map((b) => { const on = out === b.id; return { name: b.name, desc: b.desc || '', sla: b.sla || 'Not set',
       style: on ? fill(b) + '; border: 1px solid ' + b.color + '; transform: translateY(-3px); box-shadow: 0 14px 30px rgba(0,0,0,.4)'
@@ -293,10 +313,10 @@ class Component extends DCLogic {
       const nx = V.filter((v) => !(recs[v.id] && bById[recs[v.id].bucket]) && v.id !== cur.id);
       const n = nx.length ? nx[0] : null;
       this.setState({ records: recs, flash: out, toast: { text: cur.id + ' moved to ' + bById[out].name + (n ? '. Next: ' + n.id : '. Queue clear.'), color: bById[out].color },
-        sel: n ? n.id : cur.id, ans: n ? {} : ans, rationale: n ? '' : st.rationale });
+        sel: n ? n.id : cur.id, ans: n ? {} : ans, rationale: n ? '' : st.rationale, qpage: null });
       setTimeout(() => this.setState({ flash: null }), 900);
     };
-    const skip = () => { const sk = Object.assign({}, st.skipped); sk[cur.id] = true; const n = V.filter((v) => !recBucket(v.id) && !sk[v.id])[0]; if (n) this.setState({ skipped: sk, sel: n.id, ans: {}, rationale: '', toast: null }); else this.setState({ skipped: {}, toast: null }); };
+    const skip = () => { const sk = Object.assign({}, st.skipped); sk[cur.id] = true; const n = V.filter((v) => !recBucket(v.id) && !sk[v.id])[0]; if (n) this.setState({ skipped: sk, sel: n.id, ans: {}, rationale: '', toast: null, qpage: null }); else this.setState({ skipped: {}, toast: null }); };
 
     const acceptSuggested = () => { const a = Object.assign({}, this.state.ans); cfg.steps.forEach((s) => { if (s.type === 'choice' && s.source !== 'manual' && cur.sug[s.id] && s.options.some((o) => o.id === cur.sug[s.id])) a[s.id] = cur.sug[s.id]; }); this.setState({ ans: a }); };
 
@@ -319,10 +339,14 @@ class Component extends DCLogic {
     const cia = [['Confidentiality', m.C || m.VC], ['Integrity', m.I || m.VI], ['Availability', m.A || m.VA]].map((r) => ({ k: r[0], v: LVx(r[1])[0], bar: 'width: ' + LVx(r[1])[1] + '; background: ' + LVx(r[1])[2] }));
 
     // board
-    const card = (v) => { const r = st.records[v.id]; return Object.assign({}, v, { open: () => this.open(v.id), cvssStyle: cvssStyle(v.cvss), hasVec: !!(r && recBucket(v.id)), vec: r ? r.vec : '' }); };
-    const board = [{ name: 'To triage', sla: 'Awaiting decision', headStyle: 'background: #1A1F28; color: #E6EAF0', cards: untriaged.map(card) }]
-      .concat(cfg.buckets.map((b) => ({ name: b.name, sla: b.sla || '', headStyle: fill(b), cards: done.filter((v) => recBucket(v.id) === b.id).map(card) })))
-      .map((c) => Object.assign(c, { count: c.cards.length, empty: c.cards.length === 0 }));
+    const card = (v) => { const r = st.records[v.id]; return Object.assign({}, v, { label: rowLabel(v), open: () => this.open(v.id), cvssStyle: cvssStyle(v.cvss), hasVec: !!(r && recBucket(v.id)), vec: r ? r.vec : '' }); };
+    const COL = 25;
+    const board = [{ key: '_todo', name: 'To triage', sla: 'Awaiting decision', headStyle: 'background: #1A1F28; color: #E6EAF0', all: untriaged }]
+      .concat(cfg.buckets.map((b) => ({ key: b.id, name: b.name, sla: b.sla || '', headStyle: fill(b), all: done.filter((v) => recBucket(v.id) === b.id) })))
+      .map((c) => { const shown = Math.min(c.all.length, (st.boardShow || {})[c.key] || COL); const hidden = c.all.length - shown;
+        return Object.assign(c, { count: c.all.length, empty: c.all.length === 0, cards: c.all.slice(0, shown).map(card), hasMore: hidden > 0,
+          moreText: 'Show ' + Math.min(hidden, 50) + ' more (' + hidden + ' hidden)',
+          showMore: () => { const bs = Object.assign({}, st.boardShow); bs[c.key] = shown + 50; this.setState({ boardShow: bs }); } }); });
 
     // ---------- configure ----------
     const n = cfg.steps.length;
@@ -454,7 +478,7 @@ class Component extends DCLogic {
       },
       sourceDot: st.importMeta ? 'background: #4FD1A5' : 'background: #F5B03D',
       sourceText: st.importMeta ? st.importMeta.count + ' imported from ' + st.importMeta.name : 'Sample data · nothing imported',
-      filterText: st.filterText, setFilter: (e) => this.setState({ filterText: e.target.value }),
+      filterText: st.filterText, setFilter: (e) => this.setState({ filterText: e.target.value, qpage: 0 }),
       rationale: st.rationale, setRationale: (e) => this.setState({ rationale: e.target.value }),
       pasteOpen: st.pasteOpen, pasteExpanded: st.pasteOpen ? 'true' : 'false', pasteVal: st.paste,
       togglePaste: () => this.setState({ pasteOpen: !this.state.pasteOpen }),
@@ -494,14 +518,14 @@ class Component extends DCLogic {
       tabs: tabs, isQueue: st.tab === 'queue', isBoard: st.tab === 'board', isConfig: st.tab === 'config',
       flowName: cfg.name, setFlowName: (e) => { const v = e.target.value; this.upd((c) => { c.name = v; }); },
       untriagedCount: untriaged.length, bucketStrip: bucketStrip,
-      qtabs: qtabs, qlist: qlist, listEmpty: qlist.length === 0, listEmptyText: q ? 'Nothing matches "' + st.filterText + '".' : (st.qtab === 'todo' ? 'Queue clear. Nothing left to triage.' : 'No decisions recorded yet.'),
+      qtabs: qtabs, qlist: qlist, pager: pager, listEmpty: qlist.length === 0, listEmptyText: q ? 'Nothing matches "' + st.filterText + '".' : (st.qtab === 'todo' ? 'Queue clear. Nothing left to triage.' : 'No decisions recorded yet.'),
       hasToast: !!toast, toast: toast ? toast.text : '', toastStyle: toast ? 'background: ' + toast.color + '; color: #0B0E13' : '',
       cur: Object.assign({}, cur, { kevText: cur.kev ? 'Listed ' + cur.kevDate : 'Not listed', cvssVerLabel: cur.cvssVer || '3.1' }),
       curHasBucket: !!curB, curBucketName: curB ? bById[curB].name : '', curBucketStyle: curB ? fill(bById[curB]) : '',
       queuePos: pos >= 0 ? (pos + 1) + ' of ' + untriaged.length + ' in queue' : 'Already triaged',
       steps: steps, path: path,
       outcomeLabel: out ? bById[out].name : 'Pending',
-      outcomeChip: out ? fill(bById[out]) : 'background: #10141A; border: 1px dashed #2E3644; color: #9AA4B2',
+      outcomeChip: out ? fill(bById[out]) + '; border: 1px solid ' + bById[out].color : 'background: #10141A; border: 1px dashed #2E3644; color: #9AA4B2',
       outcomeHint: out ? 'From the ' + cfg.name + ' policy' : 'Complete every decision point',
       buckets: buckets, vector: vector,
       hasFloorNote: !!(res && res.floor), floorNote: res && res.floor ? 'Override rule raised this to ' + bById[res.floor.bucket].name + '.' : '',

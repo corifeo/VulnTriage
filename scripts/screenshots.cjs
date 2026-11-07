@@ -105,7 +105,7 @@ let base;
   // 3. Flow builder.
   {
     const { ctx, page } = await fresh(browser);
-    await page.getByRole('button', { name: 'Configure flow' }).click();
+    await page.getByRole('button', { name: 'Configure', exact: true }).click();
     await page.waitForTimeout(400);
     await shot(page, 'configure-flow.png');
     await shot(page, 'configure-flow-full.png', { fullPage: true });

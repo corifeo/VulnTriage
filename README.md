@@ -6,6 +6,10 @@
 </p>
 
 <p align="center">
+  <b>Try it live:</b> <a href="https://corifeo.github.io/VulnTriage/">corifeo.github.io/VulnTriage</a>
+</p>
+
+<p align="center">
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-green"></a>
   <img alt="Status: first draft" src="https://img.shields.io/badge/status-first%20draft-B7791F">
   <img alt="Dependencies: none" src="https://img.shields.io/badge/dependencies-none-1D7447">
@@ -52,6 +56,10 @@ Spreadsheets and ticket fields make that slow and inconsistent. VulnTriage makes
 
 ## Quick start
 
+**Online.** Open <https://corifeo.github.io/VulnTriage/>, the latest `main` served by GitHub Pages. Imports and decisions stay in that browser, as they do with a local copy.
+
+**Locally.**
+
 ```bash
 git clone https://github.com/corifeo/VulnTriage.git
 cd VulnTriage
@@ -60,7 +68,7 @@ python3 -m http.server 8000
 
 1. Open <http://localhost:8000>. Eight invented sample CVEs are already in the queue.
 2. Press **Pre-fill from evidence**, answer **Mission & well-being**, add a rationale and **Move to bucket**.
-3. Choose **Import › Load demo export** to bring in a real VulnFlow export, including Log4Shell.
+3. Choose **Import › Load demo export** to bring in a real VulnFlow export: 500 CVEs from NVD's Recent feed, plus Log4Shell.
 
 Opening `index.html` straight from disk also works, except **Load demo export**, which needs HTTP.
 
@@ -86,7 +94,7 @@ Weekly queue triage, an urgent KEV listing, your own patch SLAs, re-triage when 
 
 Three columns: the queue, the decision, and the evidence.
 
-- **Queue.** Untriaged CVEs with KEV, EPSS and age at a glance, plus a filter by CVE, product or CWE. **Done** lists what you've decided this session.
+- **Queue.** Untriaged CVEs with KEV, EPSS and age at a glance, 20 to a page, plus a filter by CVE, product or CWE. The page follows the CVE you're on, so moving to the next one never loses your place. **Done** lists what you've decided.
 - **Path.** The answers so far and the bucket they resolve to, updated as you click. **Pre-fill from evidence** selects every suggested option; **Reset** clears them.
 - **Decision points.** One card per question, in order. Each shows the evidence line that informs it and marks the suggested option with an **Evidence** badge.
 - **Right rail.** A plain-language summary, the affected and fixed versions, the CVSS vector broken down into an attack path (entry point, complexity, privileges, user interaction, scope) with C/I/A impact, and exploit intelligence: EPSS, KEV date, ransomware use and CISA Vulnrichment SSVC values where they exist.
@@ -102,7 +110,7 @@ Imported CVEs carry real data. Here is Log4Shell from the VulnFlow demo export, 
 
 ## Buckets
 
-One column per bucket plus **To triage**, each card showing its decision vector. Open any card to re-triage it. **Export decisions (JSON)** writes every decision for reporting or audit.
+One column per bucket plus **To triage**, each card showing its decision vector. Columns show 25 cards and grow 50 at a time with **Show more**, so a queue of hundreds stays usable. Open any card to re-triage it. **Export decisions (JSON)** writes every decision for reporting or audit.
 
 <img alt="Bucket board after a short session: CVEs spread across Track, Track*, Attend and Act, each card showing its decision vector" src="docs/screenshots/buckets.png" width="900">
 
@@ -147,13 +155,10 @@ Or, from a VulnFlow checkout:
 uv run examples/scripts/triage_queue.py data/triage-queue.json --min-epss 0.01
 ```
 
-> [!NOTE]
-> `TriageLoader` is on VulnFlow's `feat/triage-bench-loader` branch and not yet released.
-
 Then **Import** in the top bar and drop the file in. The preview shows how many CVEs, how many are in KEV and how many are already in the queue. Re-imported CVEs are updated, not duplicated; switch on **Replace the sample CVEs** to drop the built-in examples.
 
 <p align="center">
-  <img alt="Import dialog previewing the VulnFlow demo export: five CVEs, three in KEV, none already in the queue" src="docs/screenshots/import.png" width="640">
+  <img alt="Import dialog previewing the VulnFlow demo export: 501 CVEs, 4 in KEV, 3,603 matched before the 500 limit" src="docs/screenshots/import.png" width="640">
 </p>
 
 Suggested values cover Exploitation, Automatable and Technical impact:
@@ -164,14 +169,14 @@ Suggested values cover Exploitation, Automatable and Technical impact:
 | Automatable | `yes` only with AV:N, AC:L, PR:N and UI:N (CVSS v4 AU wins when present) |
 | Technical impact | `total` with high confidentiality and integrity impact; otherwise `partial` |
 
-Anything else can produce the format too. It's documented in [`docs/queue-schema.md`](docs/queue-schema.md), and a demo export with the real Log4Shell record is in [`examples/triage-queue-demo.json`](examples/triage-queue-demo.json).
+Anything else can produce the format too. It's documented in [`docs/queue-schema.md`](docs/queue-schema.md), and the demo export is in [`examples/triage-queue-demo.json`](examples/triage-queue-demo.json): the 500 top-ranked of 3,603 CVEs NVD published in the eight days to 7 November 2026, with KEV, EPSS and CWE joined, plus the real Log4Shell record as a worked example. Like most new CVEs, many have no product (CPE) data yet; the queue then shows their title.
 
 ## Storage and formats
 
 Everything lives in the browser's `localStorage`. Nothing is sent anywhere.
 
 > [!IMPORTANT]
-> Clearing site data removes your decisions. Export them from **Buckets** and your flow from **Configure flow** before you do. **Clear saved data** in Configure flow resets the page to the sample data.
+> Clearing site data removes your decisions. Export them from **Buckets** and your flow from **Configure** before you do. **Clear saved data** in Configure resets the page to the sample data.
 
 | Format | Written by | Contents |
 |---|---|---|
