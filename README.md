@@ -19,7 +19,7 @@
 </p>
 
 <p align="center">
-  <img alt="Triage view: the evidence for each SSVC decision point pre-filled on a KEV-listed VPN gateway RCE, with the path resolving to Act, and the CVSS attack path on the right" src="docs/screenshots/overview.png" width="900">
+  <img alt="Triage view: the evidence for each SSVC decision point pre-filled on a KEV-listed WordPress Core flaw from the demo export, with the path resolving to Act, and the CVSS attack path on the right" src="docs/screenshots/overview.png" width="900">
 </p>
 
 ---
@@ -66,11 +66,11 @@ cd VulnTriage
 python3 -m http.server 8000
 ```
 
-1. Open <http://localhost:8000>. Eight invented sample CVEs are already in the queue.
+1. Open <http://localhost:8000>. The queue opens on the demo export: the top 500 of the CVEs NVD published in the week to 7 November 2026, plus Log4Shell.
 2. Press **Pre-fill from evidence**, answer **Mission & well-being**, add a rationale and **Move to bucket**.
-3. Choose **Import › Load demo export** to bring in a real VulnFlow export: 500 CVEs from NVD's Recent feed, plus Log4Shell.
+3. Choose **Import** to load your own VulnFlow export, alongside the demo CVEs or in place of them.
 
-Opening `index.html` straight from disk also works, except **Load demo export**, which needs HTTP.
+Opening `index.html` straight from disk also works, but browsers block the demo file there, so the queue starts on eight invented sample CVEs instead.
 
 ## Use cases
 
@@ -104,7 +104,7 @@ Three columns: the queue, the decision, and the evidence.
   <sub>The outcome, its remediation target, the rationale and the decision vector that gets recorded</sub>
 </p>
 
-Imported CVEs carry real data. Here is Log4Shell from the VulnFlow demo export, pre-filled from its KEV listing and CVSS vector:
+Here is Log4Shell from the demo export, pre-filled from its KEV listing and CVSS vector:
 
 <img alt="Log4Shell imported from VulnFlow: Exploitation Active from the KEV listing, Automatable Yes from AV:N/AC:L/PR:N/UI:N, and NVD's summary, fixed versions and exploit references on the right" src="docs/screenshots/log4shell.png" width="900">
 
@@ -155,7 +155,7 @@ Or, from a VulnFlow checkout:
 uv run examples/scripts/triage_queue.py data/triage-queue.json --min-epss 0.01
 ```
 
-Then **Import** in the top bar and drop the file in. The preview shows how many CVEs, how many are in KEV and how many are already in the queue. Re-imported CVEs are updated, not duplicated; switch on **Replace the sample CVEs** to drop the built-in examples.
+Then **Import** in the top bar and drop the file in. The preview shows how many CVEs, how many are in KEV and how many are already in the queue. Re-imported CVEs are updated, not duplicated; switch on **Replace** to drop the demo CVEs (or the built-in samples) and keep only your export.
 
 <p align="center">
   <img alt="Import dialog previewing the VulnFlow demo export: 501 CVEs, 4 in KEV, 3,603 matched before the 500 limit" src="docs/screenshots/import.png" width="640">
@@ -176,7 +176,7 @@ Anything else can produce the format too. It's documented in [`docs/queue-schema
 Everything lives in the browser's `localStorage`. Nothing is sent anywhere.
 
 > [!IMPORTANT]
-> Clearing site data removes your decisions. Export them from **Buckets** and your flow from **Configure** before you do. **Clear saved data** in Configure resets the page to the sample data.
+> Clearing site data removes your decisions. Export them from **Buckets** and your flow from **Configure** before you do. **Clear saved data** in Configure resets the page to the demo export.
 
 | Format | Written by | Contents |
 |---|---|---|
@@ -226,7 +226,7 @@ The script serves the repository itself, clears local storage, and drives the re
 
 - **The CISA outcome table is transcribed by hand.** It needs tests against the CISA SSVC guide before anyone relies on it.
 - **Single browser.** Sharing a queue across a team needs a backend; for now, move flows and decisions as JSON.
-- **The eight built-in sample CVEs are invented.** They disappear once you import with **Replace the sample CVEs**.
+- **The demo export is a snapshot.** It's the NVD Recent feed on 7 November 2026; regenerate it with VulnFlow's `examples/scripts/triage_queue.py` for current data. The eight built-in sample CVEs used when the page is opened from disk are invented.
 - **Asset context is manual.** Mission prevalence and well-being are answered by the analyst every time.
 
 **Planned**

@@ -47,15 +47,18 @@ async function triage(page, answers, rationale) {
   await page.waitForTimeout(350);
 }
 
-async function fresh(browser, opts = {}) {
+// A fresh browser opens on the demo export. `samples: true` blocks that first load,
+// so the page starts on the built-in samples (as it does when opened from disk).
+async function fresh(browser, opts = {}, { samples = false } = {}) {
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2, ...opts });
   const page = await ctx.newPage();
   // Fonts come from the system when present; don't wait on Google Fonts.
   await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.abort());
+  // Each context starts with empty storage, so this is a first visit.
+  let served = !samples;
+  await page.route(/triage-queue-demo\.json/, r => { if (served) return r.continue(); served = true; return r.abort(); });
   await page.goto(base);
-  await page.evaluate(() => localStorage.clear());
-  await page.reload();
-  await page.waitForTimeout(400);
+  await page.waitForTimeout(samples ? 400 : 1200);
   return { ctx, page };
 }
 
@@ -74,7 +77,7 @@ let base;
     await page.getByRole('button', { name: 'Pre-fill from evidence' }).click();
     await pick(page, 'Essential');
     await pick(page, 'Material');
-    await page.locator('textarea').fill('Internet-facing on 14 remote-access gateways. No WAF rule yet; vendor fix 22.7R2.4 available.');
+    await page.locator('textarea').fill('Customer-facing sites on 12 WordPress hosts with core auto-updates off. WAF rule in place; patch tonight.');
     await page.locator('textarea').blur();
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.waitForTimeout(500);
@@ -88,12 +91,14 @@ let base;
   {
     const { ctx, page } = await fresh(browser, { viewport: { width: 1720, height: 680 } });
     const plan = [
-      [['Active', 'Yes', 'Total', 'Essential', 'Material'], 'Remote-access gateways, internet-facing.'],
-      [['Active', 'Yes', 'Total', 'Support', 'Material'], 'MFT appliance holds partner files.'],
-      [['Active', 'No', 'Total', 'Support', 'Minimal'], 'Browser fleet auto-updates; confirm rollout.'],
-      [['None', 'No', 'Total', 'Essential', 'Material'], 'SSO depends on it; needs a crafted assertion.'],
-      [['Public PoC', 'No', 'Total', 'Support', 'Minimal'], 'Only used by internal reporting service.'],
-      [['None', 'No', 'Partial', 'Minimal', 'Minimal'], 'Build hosts only.'],
+      [['Active', 'No', 'Total', 'Essential', 'Material'], 'Customer-facing WordPress sites.'],
+      [['Active', 'No', 'Partial', 'Essential', 'Material'], 'Remote access for all staff runs through it.'],
+      [['Active', 'No', 'Partial', 'Support', 'Minimal'], 'Branch firewalls; MFA already enforced on SSLVPN.'],
+      [['Active', 'Yes', 'Total', 'Support', 'Material'], 'Two legacy Java services still on 2.14.'],
+      [['None', 'No', 'Total', 'Essential', 'Material'], 'Key manager holds production certificates.'],
+      [['None', 'No', 'Partial', 'Minimal', 'Minimal'], 'Only on two lab hosts.'],
+      [['None', 'No', 'Total', 'Support', 'Material'], 'Monitoring only; not internet-facing.'],
+      [['None', 'No', 'Partial', 'Minimal', 'Minimal'], 'Not deployed.'],
     ];
     for (const [answers, why] of plan) await triage(page, answers, why);
     await page.getByRole('button', { name: 'Buckets' }).click();
@@ -114,13 +119,14 @@ let base;
 
   // 4. Import the VulnFlow demo export, then triage the real Log4Shell record.
   {
-    const { ctx, page } = await fresh(browser);
+    const { ctx, page } = await fresh(browser, {}, { samples: true });
     await page.getByRole('button', { name: 'Import', exact: true }).click();
     await page.waitForTimeout(250);
     await page.getByRole('button', { name: 'Load demo export' }).click();
     await page.waitForTimeout(500);
     const dialog = page.getByRole('dialog', { name: 'Import vulnerabilities' });
     await dialog.screenshot({ path: path.join(OUT, 'import.png') });
+    await dialog.locator('button', { hasText: 'Replace the sample CVEs' }).click();
     await dialog.locator('button').last().click();
     await page.waitForTimeout(400);
     await page.locator('aside button').filter({ hasText: 'CVE-2021-44228' }).first().click();

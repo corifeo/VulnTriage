@@ -7,6 +7,26 @@ class Component extends DCLogic {
       filterText: '', rationale: '', qpage: null, boardShow: {}, pasteOpen: false, replaceSampleApplied: false };
     const saved = this.loadSaved();
     if (saved) Object.assign(this.state, saved);
+    // Nothing of the user's own yet: open on the demo export rather than the eight invented samples.
+    this._wantDemo = !saved || (!saved.imported.length && !Object.keys(saved.records).length);
+  }
+
+  componentDidMount() { if (this._wantDemo) this.loadDemoDataset(); }
+
+  demoUrl() { return 'examples/triage-queue-demo.json'; }
+
+  // Loads the demo export as the queue, replacing the built-in samples. Opened from disk
+  // (file://) the request fails and the samples stay, which still works offline.
+  loadDemoDataset() {
+    return fetch(this.demoUrl(), { cache: 'no-cache' }).then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then((doc) => {
+        const items = this.fromExport(doc);
+        if (!items.length || this.state.imported.length) return;
+        const first = items.find((v) => !this.state.records[v.id]) || items[0];
+        this.setState({ imported: items, replaceSampleApplied: true, sel: first.id, ans: {}, rationale: '', qpage: null, skipped: {},
+          importMeta: { name: 'the demo export', generated: doc.generated_at, count: items.length, demo: true } });
+      })
+      .catch(() => { /* keep the built-in samples */ });
   }
 
   palette() { return ['#A7B0BE', '#6EA8FF', '#4FD1A5', '#F5B03D', '#FF7A59', '#C792EA']; }
@@ -476,14 +496,16 @@ class Component extends DCLogic {
           sel: first.id, ans: {}, rationale: '', importMeta: { name: pvw.fileName, generated: pvw.doc.generated_at, count: imported.length },
           toast: { text: 'Imported ' + added + ' new' + (updated ? ', updated ' + updated : '') + ' from ' + pvw.fileName, color: '#6EA8FF' } });
       },
+      replaceLabel: st.importMeta && st.importMeta.demo ? 'Replace the demo CVEs (otherwise imports are added to the queue)'
+        : (st.imported.length ? 'Replace earlier imports and the sample CVEs (otherwise imports are added to the queue)' : 'Replace the sample CVEs (otherwise imports are added to the queue)'),
       sourceDot: st.importMeta ? 'background: #4FD1A5' : 'background: #F5B03D',
-      sourceText: st.importMeta ? st.importMeta.count + ' imported from ' + st.importMeta.name : 'Sample data · nothing imported',
+      sourceText: st.importMeta ? (st.importMeta.demo ? 'Demo export · ' + st.importMeta.count + ' real CVEs from NVD' : st.importMeta.count + ' imported from ' + st.importMeta.name) : 'Sample data · nothing imported',
       filterText: st.filterText, setFilter: (e) => this.setState({ filterText: e.target.value, qpage: 0 }),
       rationale: st.rationale, setRationale: (e) => this.setState({ rationale: e.target.value }),
       pasteOpen: st.pasteOpen, pasteExpanded: st.pasteOpen ? 'true' : 'false', pasteVal: st.paste,
       togglePaste: () => this.setState({ pasteOpen: !this.state.pasteOpen }),
       loadDemo: () => {
-        fetch('examples/triage-queue-demo.json').then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+        fetch(this.demoUrl(), { cache: 'no-cache' }).then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
           .then((txt) => this.readText(txt, 'triage-queue-demo.json'))
           .catch(() => this.setState({ importErr: 'Could not load the demo file. Serve the folder over HTTP (for example: python3 -m http.server) rather than opening index.html directly.' }));
       },
@@ -513,7 +535,8 @@ class Component extends DCLogic {
       clearSaved: () => {
         if (!window.confirm('Clear the saved flow, decisions and imports from this browser?')) return;
         try { window.localStorage.removeItem(this.storageKey()); } catch (_) { /* ignore */ }
-        this.setState({ config: this.cisa(), records: {}, imported: [], importMeta: null, replaceSampleApplied: false, sel: 'CVE-2026-41872', ans: {}, rationale: '', skipped: {}, toast: null });
+        this.setState({ config: this.cisa(), records: {}, imported: [], importMeta: null, replaceSampleApplied: false, sel: 'CVE-2026-41872', ans: {}, rationale: '', skipped: {}, toast: null, qpage: null, boardShow: {} });
+        this.loadDemoDataset();
       },
       tabs: tabs, isQueue: st.tab === 'queue', isBoard: st.tab === 'board', isConfig: st.tab === 'config',
       flowName: cfg.name, setFlowName: (e) => { const v = e.target.value; this.upd((c) => { c.name = v; }); },
